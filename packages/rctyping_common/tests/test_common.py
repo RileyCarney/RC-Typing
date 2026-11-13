@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -231,5 +232,24 @@ def test_corpus_repository(tmp_path):
     cats = repo.list_categories()
     assert "code" in cats and "python" in cats["code"]
     assert "prose" in cats
+
+
+def test_production_corpus_integrity():
+    corpus_dir = Path(__file__).resolve().parents[3] / "corpus" / "data"
+    repo = CorpusRepository.load_from_dir(corpus_dir)
+
+    assert len(repo._passages) == 1125
+    assert len({p.id for p in repo._passages}) == 1125
+    assert len({p.text for p in repo._passages}) == 1125
+    assert len({(p.category, p.language, p.title) for p in repo._passages}) == 1125
+
+    for p in repo._passages:
+        assert repo.verify_passage_text(p.id, p.text) is True
+        assert all(c == "\n" or (32 <= ord(c) <= 126) for c in p.text), (
+            f"Non-ASCII or disallowed control char in passage {p.id}"
+        )
+        assert all(line == line.rstrip() for line in p.text.split("\n")), (
+            f"Trailing whitespace in passage {p.id}"
+        )
 
 

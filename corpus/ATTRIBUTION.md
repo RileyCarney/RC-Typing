@@ -6,18 +6,18 @@ The rc-typing corpus consists of curated, permissive passages selected to benchm
 
 | Category / Language | Sources | License | Attribution |
 |---|---|---|---|
-| `code/python` | Algorithms examples, Standard Library idioms | MIT | Python Software Foundation & Open Source Contributors |
-| `code/powershell` | PowerShell documentation examples & cmdlets | MIT | Microsoft Corporation & PowerShell Community |
-| `code/cpp` | Modern C++ patterns & STL vector algorithms | Apache-2.0 | C++ Standard Examples & Contributors |
-| `code/csharp` | .NET Foundation samples, C# language specs | MIT | .NET Community & Microsoft Corporation |
-| `code/javascript` | MDN Web Docs snippets, frontend utilities | MIT | MDN Web Docs & Open Source Community |
-| `code/typescript` | TypeScript Handbook patterns & generic types | MIT | TypeScript Community & Microsoft Corporation |
-| `code/sql` | SQL standard analytics, window functions, CTEs | Apache-2.0 | Database Engineering Community |
-| `prose` | Classic literature (*Pride and Prejudice*, *Moby Dick*) | Public Domain | Jane Austen, Herman Melville (Project Gutenberg) |
-| `reading` | Encyclopedic articles (Solar System, Movable Type) | CC BY-SA 4.0 | Wikipedia Contributors |
-| `technical` | Cryptography, Distributed Systems abstracts | CC0 / MIT | Computer Science Research Community |
-| `formal` | US Constitution Preamble, Universal Declaration of Human Rights | Public Domain | US Constitutional Convention, UN General Assembly |
-| `conversational` | Engineering standups, technical support dialogues | CC0 | Software Engineering Dialogues |
+| `code/python` | Algorithms, Standard Library idioms, decorators, concurrency | MIT | Python Software Foundation & Open Source Contributors |
+| `code/powershell` | PowerShell cmdlets, parallel processing, diagnostics & REST APIs | MIT | Microsoft Corporation & PowerShell Community |
+| `code/cpp` | Modern C++ patterns, STL algorithms, variants, mutexes & memory management | Apache-2.0 | C++ Standard Examples & Contributors |
+| `code/csharp` | .NET Foundation samples, pattern matching, channels, spans & DI | MIT | .NET Community & Microsoft Corporation |
+| `code/javascript` | MDN Web Docs snippets, async utilities, LRU cache & DOM observers | MIT | MDN Web Docs & Open Source Community |
+| `code/typescript` | TypeScript Handbook patterns, type guards, discriminated unions & pipelines | MIT | TypeScript Community & Microsoft Corporation |
+| `code/sql` | SQL standard analytics, recursive CTEs, window functions, JSONB & indexing | Apache-2.0 | Database Engineering Community |
+| `prose` | Classic literature (*Pride and Prejudice*, *Moby Dick*, *A Tale of Two Cities*, *The Great Gatsby*, *Frankenstein*, *Jane Eyre*, *Sherlock Holmes*, *Alice in Wonderland*, *Walden*, *The Odyssey*, *Great Expectations*) | Public Domain | Project Gutenberg Authors |
+| `reading` | Encyclopedic articles (Solar System, Movable Type, Photosynthesis, Plate Tectonics, Printing Press, Immune System, Internet History, Ocean Currents, Roman Architecture, Acoustic Resonance, Water Cycle) | CC BY-SA 4.0 | Wikipedia Contributors |
+| `technical` | Cryptography, Distributed Consensus, B-Trees, Zero-Knowledge Proofs, Garbage Collection, TCP, Storage, Vector Clocks, Compilers, Cache Coherence, Bloom Filters | CC0 / MIT | Computer Science Research Community |
+| `formal` | US Constitution Preamble, Universal Declaration of Human Rights, Gettysburg Address, Magna Carta, Declaration of Independence, First Amendment, Federalist No. 51, Outer Space Treaty, standard legal/patent clauses | Public Domain / CC0 | Historical Public Domain, US/UN Records & Legal Drafting Templates |
+| `conversational` | Engineering standups, support dialogues, code reviews, postmortems, interviews, onboarding & release checks | CC0 | Software Engineering Dialogues |
 
 ## Compliance Notes
 - All code excerpts are permissively licensed (MIT, Apache-2.0).

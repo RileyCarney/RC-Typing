@@ -9,10 +9,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.5.15 /uv /bin/uv
 # Copy common package and app package
 COPY packages/rctyping_common /build/packages/rctyping_common
 COPY app /build/app
-COPY pyproject.toml /build/pyproject.toml
 
 # Install dependencies into virtualenv
-ENV UV_PROJECT_ENVIRONMENT="/app/.venv"
+ENV VIRTUAL_ENV="/app/.venv"
 RUN uv venv /app/.venv && \
     uv pip install --no-cache /build/packages/rctyping_common /build/app
 
