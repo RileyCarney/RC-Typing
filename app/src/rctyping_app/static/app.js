@@ -32,6 +32,7 @@ const viewInVerifierBtn = document.getElementById('view-in-verifier-btn');
 document.addEventListener('DOMContentLoaded', () => {
   setupTabs();
   setupSettings();
+  setupTypingThoughts();
   loadNewPassage();
 
   categorySelect.addEventListener('change', () => {
@@ -65,6 +66,10 @@ function setupTabs() {
       const tabId = `tab-${btn.dataset.tab}`;
       document.getElementById(tabId).classList.add('active');
 
+      if (btn.dataset.tab === 'thoughts') {
+        loadBrain();
+        document.getElementById('thought-input')?.focus();
+      }
       if (btn.dataset.tab === 'stats') loadStats();
       if (btn.dataset.tab === 'settings') loadSettings();
     });
@@ -458,4 +463,507 @@ function setupSettings() {
       alert('Error saving settings: ' + err.message);
     }
   });
+}
+
+// --- Typing Thoughts & Brain Explorer ---
+let thoughtStartTime = null;
+let thoughtInterval = null;
+let activeFolderId = null; // null = Brain root
+let brainState = { folders: [], thoughts: [], encryption: null };
+const collapsedFolders = new Set();
+let draggedThoughtId = null;
+
+function setupTypingThoughts() {
+  const input = document.getElementById('thought-input');
+  const pushBtn = document.getElementById('push-thought-btn');
+  const createFolderBtn = document.getElementById('create-folder-btn');
+  const newFolderInput = document.getElementById('new-folder-input');
+  const exportZipBtn = document.getElementById('export-brain-zip-btn');
+  if (!input || !pushBtn) return;
+
+  input.addEventListener('keydown', (e) => {
+    if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key)) {
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      pushCurrentThought();
+      return;
+    }
+    if (!thoughtStartTime && (e.key.length === 1 || e.key === 'Backspace')) {
+      startThoughtTimer();
+    }
+  });
+
+  input.addEventListener('input', () => {
+    if (!input.value.trim()) {
+      resetThoughtComposerTimer();
+    } else if (!thoughtStartTime) {
+      startThoughtTimer();
+    }
+    updateThoughtLiveTelemetry();
+  });
+
+  pushBtn.addEventListener('click', pushCurrentThought);
+
+  createFolderBtn?.addEventListener('click', createBrainFolder);
+  newFolderInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      createBrainFolder();
+    }
+  });
+
+  exportZipBtn?.addEventListener('click', () => {
+    window.location.href = '/api/thoughts/export-zip';
+  });
+}
+
+function startThoughtTimer() {
+  thoughtStartTime = performance.now();
+  if (thoughtInterval) clearInterval(thoughtInterval);
+  thoughtInterval = setInterval(updateThoughtLiveTelemetry, 100);
+  const hint = document.getElementById('thought-status-hint');
+  if (hint) hint.innerText = 'Measuring typing speed... Press Enter to push thought';
+}
+
+function resetThoughtComposerTimer() {
+  thoughtStartTime = null;
+  if (thoughtInterval) {
+    clearInterval(thoughtInterval);
+    thoughtInterval = null;
+  }
+  const wpmEl = document.getElementById('thought-live-wpm');
+  const timeEl = document.getElementById('thought-live-time');
+  const charsEl = document.getElementById('thought-live-chars');
+  if (wpmEl) wpmEl.innerText = '0';
+  if (timeEl) timeEl.innerText = '0.0s';
+  if (charsEl) charsEl.innerText = '0';
+}
+
+function updateThoughtLiveTelemetry() {
+  const input = document.getElementById('thought-input');
+  if (!input) return;
+  const text = input.value;
+  const charsEl = document.getElementById('thought-live-chars');
+  const wpmEl = document.getElementById('thought-live-wpm');
+  const timeEl = document.getElementById('thought-live-time');
+
+  if (charsEl) charsEl.innerText = String(text.length);
+  if (!thoughtStartTime) return;
+
+  const elapsedMs = Math.max(1, performance.now() - thoughtStartTime);
+  const elapsedSec = elapsedMs / 1000;
+  const minutes = Math.max(0.001, elapsedSec / 60);
+  const wpm = Math.round((text.length / 5) / minutes);
+
+  if (wpmEl) wpmEl.innerText = String(wpm);
+  if (timeEl) timeEl.innerText = `${elapsedSec.toFixed(1)}s`;
+}
+
+async function pushCurrentThought() {
+  const input = document.getElementById('thought-input');
+  const filenameInput = document.getElementById('thought-filename-input');
+  const hint = document.getElementById('thought-status-hint');
+  if (!input) return;
+
+  const content = input.value.trim();
+  if (!content) {
+    if (hint) hint.innerText = 'Type a thought before pushing.';
+    return;
+  }
+
+  const durationMs = thoughtStartTime ? Math.max(50, Math.round(performance.now() - thoughtStartTime)) : 500;
+  const minutes = Math.max(0.001, durationMs / 60000);
+  const wpm = Math.round(((content.length / 5) / minutes) * 10) / 10;
+  const customFilename = filenameInput ? filenameInput.value.trim() : '';
+
+  try {
+    const res = await fetch('/api/thoughts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
+        duration_ms: durationMs,
+        wpm,
+        folder_id: activeFolderId,
+        filename: customFilename || null
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    const created = await res.json();
+    input.value = '';
+    if (filenameInput) filenameInput.value = '';
+    resetThoughtComposerTimer();
+    if (hint) {
+      hint.innerText = `Pushed ${created.filename} (${created.wpm} WPM in ${created.total_time}) - encrypted locally.`;
+    }
+    await loadBrain();
+    input.focus();
+  } catch (err) {
+    if (hint) hint.innerText = `Error saving thought: ${err.message}`;
+    console.error(err);
+  }
+}
+
+async function loadBrain() {
+  try {
+    const res = await fetch('/api/thoughts/brain');
+    if (!res.ok) throw new Error(await res.text());
+    brainState = await res.json();
+
+    if (activeFolderId && !brainState.folders.some(f => f.id === activeFolderId)) {
+      activeFolderId = null;
+    }
+
+    const badge = document.getElementById('brain-encryption-badge');
+    if (badge && brainState.encryption) {
+      badge.innerText = `${brainState.encryption.algorithm} Local Encrypted`;
+    }
+
+    await persistEncryptedBrainMirror(brainState);
+    renderBrainExplorer();
+    renderBrainThoughts();
+  } catch (err) {
+    console.error('Failed to load brain', err);
+  }
+}
+
+// Local browser Web Crypto AES-GCM mirror for offline client-side encrypted storage
+async function persistEncryptedBrainMirror(state) {
+  if (!window.crypto?.subtle) return;
+  try {
+    const keyStorageKey = 'rc_typing_brain_key_v1';
+    const dataStorageKey = 'rc_typing_brain_encrypted_v1';
+    let rawKeyB64 = localStorage.getItem(keyStorageKey);
+    let cryptoKey;
+
+    if (!rawKeyB64) {
+      cryptoKey = await window.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+      const exported = await window.crypto.subtle.exportKey('raw', cryptoKey);
+      rawKeyB64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
+      localStorage.setItem(keyStorageKey, rawKeyB64);
+    } else {
+      const keyBytes = Uint8Array.from(atob(rawKeyB64), c => c.charCodeAt(0));
+      cryptoKey = await window.crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    }
+
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(JSON.stringify({ folders: state.folders, thoughts: state.thoughts }));
+    const cipherBuf = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, encoded);
+    localStorage.setItem(dataStorageKey, JSON.stringify({
+      alg: 'AES-GCM',
+      iv: btoa(String.fromCharCode(...iv)),
+      ciphertext: btoa(String.fromCharCode(...new Uint8Array(cipherBuf)))
+    }));
+  } catch (err) {
+    console.warn('Local WebCrypto mirror skipped:', err);
+  }
+}
+
+async function createBrainFolder() {
+  const input = document.getElementById('new-folder-input');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return;
+
+  try {
+    const res = await fetch('/api/thoughts/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        parent_id: activeFolderId
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const created = await res.json();
+    input.value = '';
+    activeFolderId = created.id;
+    await loadBrain();
+  } catch (err) {
+    alert('Could not create folder: ' + err.message);
+  }
+}
+
+async function deleteBrainFolder(folderId) {
+  try {
+    const res = await fetch(`/api/thoughts/folders/${folderId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    if (activeFolderId === folderId) activeFolderId = null;
+    await loadBrain();
+  } catch (err) {
+    alert('Error deleting folder: ' + err.message);
+  }
+}
+
+async function moveThoughtToFolder(thoughtId, targetFolderId) {
+  try {
+    const payload = targetFolderId ? { folder_id: targetFolderId } : { move_to_root: true };
+    const res = await fetch(`/api/thoughts/${thoughtId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await loadBrain();
+  } catch (err) {
+    alert('Error moving thought: ' + err.message);
+  }
+}
+
+async function deleteThought(thoughtId) {
+  try {
+    const res = await fetch(`/api/thoughts/${thoughtId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    await loadBrain();
+  } catch (err) {
+    alert('Error deleting thought: ' + err.message);
+  }
+}
+
+function attachFolderDropHandlers(rowEl, folderId) {
+  rowEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    rowEl.classList.add('drag-over');
+  });
+  rowEl.addEventListener('dragleave', () => {
+    rowEl.classList.remove('drag-over');
+  });
+  rowEl.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    rowEl.classList.remove('drag-over');
+    const droppedId = e.dataTransfer.getData('text/plain') || draggedThoughtId;
+    if (droppedId) {
+      await moveThoughtToFolder(droppedId, folderId);
+      draggedThoughtId = null;
+    }
+  });
+}
+
+function attachThoughtDragHandlers(el, thoughtId) {
+  el.setAttribute('draggable', 'true');
+  el.addEventListener('dragstart', (e) => {
+    draggedThoughtId = thoughtId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', thoughtId);
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => {
+    draggedThoughtId = null;
+    el.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+  });
+}
+
+function renderBrainExplorer() {
+  const tree = document.getElementById('brain-explorer-tree');
+  const activeLabel = document.getElementById('thought-active-folder-label');
+  if (!tree) return;
+  tree.innerHTML = '';
+
+  const activeFolder = brainState.folders.find(f => f.id === activeFolderId);
+  if (activeLabel) {
+    activeLabel.innerText = activeFolder ? `Brain / ${activeFolder.path}` : 'Brain /';
+  }
+
+  // Root node
+  const rootRow = document.createElement('div');
+  rootRow.className = `tree-folder-row${activeFolderId === null ? ' active' : ''}`;
+  rootRow.dataset.folderId = 'root';
+  rootRow.innerHTML = `<span class="tree-folder-label"><span>&#128193;</span><span class="tree-folder-name">Brain / (Root)</span></span>`;
+  rootRow.addEventListener('click', () => {
+    activeFolderId = null;
+    renderBrainExplorer();
+    renderBrainThoughts();
+  });
+  attachFolderDropHandlers(rootRow, null);
+  tree.appendChild(rootRow);
+
+  const rootChildrenWrap = document.createElement('div');
+  rootChildrenWrap.className = 'tree-children';
+  renderFolderBranch(null, rootChildrenWrap);
+  tree.appendChild(rootChildrenWrap);
+}
+
+function renderFolderBranch(parentId, container) {
+  const childFolders = brainState.folders.filter(f => (f.parent_id || null) === parentId);
+  for (const folder of childFolders) {
+    const isCollapsed = collapsedFolders.has(folder.id);
+    const row = document.createElement('div');
+    row.className = `tree-folder-row${activeFolderId === folder.id ? ' active' : ''}`;
+    row.dataset.folderId = folder.id;
+
+    const label = document.createElement('span');
+    label.className = 'tree-folder-label';
+
+    const toggle = document.createElement('span');
+    toggle.innerText = isCollapsed ? '▸' : '▾';
+    toggle.style.cursor = 'pointer';
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isCollapsed) collapsedFolders.delete(folder.id);
+      else collapsedFolders.add(folder.id);
+      renderBrainExplorer();
+    });
+
+    const icon = document.createElement('span');
+    icon.innerHTML = '&#128193;';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'tree-folder-name';
+    nameSpan.innerText = folder.name;
+
+    label.append(toggle, icon, nameSpan);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'tree-folder-delete';
+    delBtn.title = 'Delete folder (thoughts move to parent)';
+    delBtn.innerHTML = '&times;';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteBrainFolder(folder.id);
+    });
+
+    row.append(label, delBtn);
+    row.addEventListener('click', () => {
+      activeFolderId = folder.id;
+      renderBrainExplorer();
+      renderBrainThoughts();
+    });
+    attachFolderDropHandlers(row, folder.id);
+    container.appendChild(row);
+
+    if (!isCollapsed) {
+      const branch = document.createElement('div');
+      branch.className = 'tree-children';
+      renderFolderBranch(folder.id, branch);
+      container.appendChild(branch);
+    }
+  }
+
+  // Render .md files directly inside parentId in explorer tree
+  const folderThoughts = brainState.thoughts.filter(t => (t.folder_id || null) === parentId);
+  for (const thought of folderThoughts) {
+    const fileEl = document.createElement('div');
+    fileEl.className = 'tree-file-item';
+    fileEl.title = `${thought.filename} (${thought.wpm} WPM, ${thought.total_time})`;
+    fileEl.innerHTML = `<span>&#128196;</span><span class="tree-folder-name"></span>`;
+    fileEl.querySelector('.tree-folder-name').innerText = thought.filename;
+    attachThoughtDragHandlers(fileEl, thought.id);
+    container.appendChild(fileEl);
+  }
+}
+
+function renderBrainThoughts() {
+  const listEl = document.getElementById('brain-thoughts-list');
+  const headingEl = document.getElementById('brain-current-path-heading');
+  const countEl = document.getElementById('brain-thought-count');
+  if (!listEl) return;
+
+  const activeFolder = brainState.folders.find(f => f.id === activeFolderId);
+  const visibleThoughts = activeFolderId === null
+    ? brainState.thoughts
+    : brainState.thoughts.filter(t => t.folder_id === activeFolderId);
+
+  if (headingEl) {
+    headingEl.innerText = activeFolder ? `Brain / ${activeFolder.path}` : 'Brain / (All Thoughts)';
+  }
+  if (countEl) {
+    countEl.innerText = `${visibleThoughts.length} thought${visibleThoughts.length === 1 ? '' : 's'}`;
+  }
+
+  listEl.innerHTML = '';
+  if (visibleThoughts.length === 0) {
+    listEl.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No thoughts in this folder yet. Type above and press Enter to push one!</p>';
+    return;
+  }
+
+  for (const t of visibleThoughts) {
+    const card = document.createElement('div');
+    card.className = 'thought-card';
+    attachThoughtDragHandlers(card, t.id);
+
+    const top = document.createElement('div');
+    top.className = 'thought-card-top';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'thought-filename';
+    nameEl.innerText = t.filename;
+
+    const metrics = document.createElement('div');
+    metrics.className = 'thought-metrics';
+    const wpmPill = document.createElement('span');
+    wpmPill.className = 'thought-pill';
+    wpmPill.innerText = `${t.wpm} WPM`;
+    const timePill = document.createElement('span');
+    timePill.className = 'thought-pill';
+    timePill.innerText = t.total_time;
+    const pathPill = document.createElement('span');
+    pathPill.className = 'thought-pill';
+    pathPill.innerText = `/${t.folder_path || ''}`;
+    metrics.append(wpmPill, timePill, pathPill);
+    top.append(nameEl, metrics);
+
+    const body = document.createElement('div');
+    body.className = 'thought-body';
+    body.innerText = t.content;
+
+    const actions = document.createElement('div');
+    actions.className = 'thought-card-actions';
+
+    const moveLabel = document.createElement('label');
+    moveLabel.style.display = 'flex';
+    moveLabel.style.alignItems = 'center';
+    moveLabel.style.gap = '0.4rem';
+    moveLabel.innerText = 'Folder:';
+
+    const moveSelect = document.createElement('select');
+    moveSelect.className = 'thought-move-select';
+    const rootOpt = document.createElement('option');
+    rootOpt.value = '';
+    rootOpt.innerText = 'Brain / (Root)';
+    if (!t.folder_id) rootOpt.selected = true;
+    moveSelect.appendChild(rootOpt);
+
+    for (const f of brainState.folders) {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.innerText = f.path;
+      if (t.folder_id === f.id) opt.selected = true;
+      moveSelect.appendChild(opt);
+    }
+    moveSelect.addEventListener('change', () => moveThoughtToFolder(t.id, moveSelect.value || null));
+    moveLabel.appendChild(moveSelect);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.style.display = 'flex';
+    btnGroup.style.gap = '0.4rem';
+
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'btn btn-secondary btn-xs';
+    dlBtn.innerText = 'Download .md';
+    dlBtn.addEventListener('click', () => {
+      const blob = new Blob([t.markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = t.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger btn-xs';
+    delBtn.innerText = 'Delete';
+    delBtn.addEventListener('click', () => deleteThought(t.id));
+
+    btnGroup.append(dlBtn, delBtn);
+    actions.append(moveLabel, btnGroup);
+
+    card.append(top, body, actions);
+    listEl.appendChild(card);
+  }
 }

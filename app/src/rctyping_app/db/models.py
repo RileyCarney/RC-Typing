@@ -31,6 +31,8 @@ class UserModel(Base):
     settings = relationship("UserSettingsModel", back_populates="user", uselist=False, cascade="all, delete-orphan")
     sessions = relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
     certificates = relationship("CertificateModel", back_populates="user", cascade="all, delete-orphan")
+    thought_folders = relationship("ThoughtFolderModel", back_populates="user", cascade="all, delete-orphan")
+    thoughts = relationship("ThoughtModel", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettingsModel(Base):
@@ -42,6 +44,39 @@ class UserSettingsModel(Base):
     default_cert_name = Column(String(64), default="Anonymous Typist", nullable=False)
 
     user = relationship("UserModel", back_populates="settings")
+    # Keep UserModel relationships intact below
+
+
+class ThoughtFolderModel(Base):
+    __tablename__ = "thought_folders"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    name = Column(String(128), nullable=False)
+    parent_id = Column(String(36), ForeignKey("thought_folders.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+
+    user = relationship("UserModel", back_populates="thought_folders")
+    thoughts = relationship("ThoughtModel", back_populates="folder")
+
+
+class ThoughtModel(Base):
+    __tablename__ = "thoughts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    folder_id = Column(String(36), ForeignKey("thought_folders.id"), nullable=True)
+    filename = Column(String(160), nullable=False)
+    wpm = Column(Float, nullable=False)
+    duration_ms = Column(Integer, nullable=False)
+    chars_typed = Column(Integer, nullable=False)
+    encrypted_content = Column(Text, nullable=False)
+    encrypted_markdown = Column(Text, nullable=False)
+    encryption_alg = Column(String(32), default="AES-256-GCM", nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+
+    user = relationship("UserModel", back_populates="thoughts")
+    folder = relationship("ThoughtFolderModel", back_populates="thoughts")
 
 
 class SessionModel(Base):

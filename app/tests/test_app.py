@@ -148,3 +148,115 @@ def test_favicon_served():
 
         static_resp = client.get("/static/favicon.svg")
         assert static_resp.status_code == 200
+
+
+def test_typing_thoughts_brain_encryption_folders_and_zip_export():
+    import io
+    import zipfile
+    from rctyping_app.db.models import ThoughtModel
+    from rctyping_app.db.session import get_app_session
+    from rctyping_app.main import app_keystore
+
+    with TestClient(app) as client:
+        # Verify UI serves Typing Thoughts tab
+        html_resp = client.get("/")
+        assert html_resp.status_code == 200
+        assert "Typing Thoughts" in html_resp.text
+        assert "Export Brain (.zip)" in html_resp.text
+
+        # 1. Create root folder and nested folder
+        f_root_resp = client.post("/api/thoughts/folders", json={"name": "Projects"})
+        assert f_root_resp.status_code == 200
+        projects_folder = f_root_resp.json()
+        assert projects_folder["path"] == "Projects"
+
+        f_sub_resp = client.post(
+            "/api/thoughts/folders",
+            json={"name": "Ideas", "parent_id": projects_folder["id"]},
+        )
+        assert f_sub_resp.status_code == 200
+        ideas_folder = f_sub_resp.json()
+        assert ideas_folder["path"] == "Projects/Ideas"
+
+        # 2. Push thoughts (one in root, one in Projects)
+        thought_text = "Build a fast local-first encrypted brain for typing thoughts."
+        t1_resp = client.post(
+            "/api/thoughts",
+            json={
+                "content": thought_text,
+                "duration_ms": 6000,
+                "filename": "brain-architecture",
+            },
+        )
+        assert t1_resp.status_code == 200
+        t1 = t1_resp.json()
+        assert t1["filename"] == "brain-architecture.md"
+        assert t1["wpm"] > 0
+        assert t1["duration_ms"] == 6000
+        assert t1["total_time"] == "6.0s"
+        assert t1["encryption_alg"] == "AES-256-GCM"
+        assert f"wpm: {t1['wpm']}" in t1["markdown"]
+        assert "total_time: 6.0s" in t1["markdown"]
+
+        t2_resp = client.post(
+            "/api/thoughts",
+            json={
+                "content": "Second thought inside projects folder",
+                "duration_ms": 3500,
+                "wpm": 82.4,
+                "folder_id": projects_folder["id"],
+            },
+        )
+        assert t2_resp.status_code == 200
+        t2 = t2_resp.json()
+        assert t2["filename"].endswith(".md")
+        assert t2["folder_path"] == "Projects"
+        assert t2["wpm"] == 82.4
+
+        # 3. Verify encrypted at rest in SQLite
+        with get_app_session() as db:
+            row = db.query(ThoughtModel).filter(ThoughtModel.id == t1["id"]).first()
+            assert row is not None
+            assert thought_text not in row.encrypted_content
+            assert thought_text not in row.encrypted_markdown
+            assert app_keystore is not None
+            assert app_keystore.decrypt_text(row.encrypted_content) == thought_text
+
+        # 4. Drag/move thought t1 into Projects/Ideas
+        move_resp = client.patch(
+            f"/api/thoughts/{t1['id']}",
+            json={"folder_id": ideas_folder["id"]},
+        )
+        assert move_resp.status_code == 200
+        moved = move_resp.json()
+        assert moved["folder_id"] == ideas_folder["id"]
+        assert moved["folder_path"] == "Projects/Ideas"
+        assert 'folder: "Projects/Ideas"' in moved["markdown"]
+
+        # 5. Export Brain as .zip and verify .md files and folder structure
+        zip_resp = client.get("/api/thoughts/export-zip")
+        assert zip_resp.status_code == 200
+        assert "application/zip" in zip_resp.headers.get("content-type", "")
+
+        with zipfile.ZipFile(io.BytesIO(zip_resp.content), "r") as zf:
+            names = zf.namelist()
+            assert f"Projects/Ideas/{t1['filename']}" in names
+            assert f"Projects/{t2['filename']}" in names
+            exported_md = zf.read(f"Projects/Ideas/{t1['filename']}").decode("utf-8")
+            assert thought_text in exported_md
+            assert f"wpm: {t1['wpm']}" in exported_md
+            assert "total_time: 6.0s" in exported_md
+
+        # 6. Deleting a folder preserves thoughts by moving them up to parent
+        del_sub = client.delete(f"/api/thoughts/folders/{ideas_folder['id']}")
+        assert del_sub.status_code == 200
+        brain_resp = client.get("/api/thoughts/brain")
+        assert brain_resp.status_code == 200
+        brain_data = brain_resp.json()
+        t1_after = next(t for t in brain_data["thoughts"] if t["id"] == t1["id"])
+        assert t1_after["folder_id"] == projects_folder["id"]
+
+        # Cleanup created test thoughts & folder
+        assert client.delete(f"/api/thoughts/{t1['id']}").status_code == 200
+        assert client.delete(f"/api/thoughts/{t2['id']}").status_code == 200
+        assert client.delete(f"/api/thoughts/folders/{projects_folder['id']}").status_code == 200

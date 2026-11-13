@@ -16,6 +16,7 @@
     </div>
     <nav>
       <button class="nav-btn active" data-tab="test">Typing Test</button>
+      <button class="nav-btn" data-tab="thoughts">Typing Thoughts</button>
       <button class="nav-btn" data-tab="verify">Verify Certificate</button>
       <button class="nav-btn" data-tab="stats">Stats & History</button>
       <button class="nav-btn" data-tab="settings">Settings</button>
@@ -80,6 +81,75 @@
         <div id="typing-viewport" class="typing-viewport" tabindex="0"></div>
 
         <div class="focus-notice" id="focus-hint">Click inside or start typing to begin test</div>
+      </div>
+    </section>
+
+    <!-- TAB 1B: TYPING THOUGHTS -->
+    <section id="tab-thoughts" class="tab-content">
+      <div class="live-stats">
+        <div class="stat-card">
+          <div class="stat-value" id="thought-live-wpm">0</div>
+          <div class="stat-label">Speed (WPM)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="thought-live-time">0.0s</div>
+          <div class="stat-label">Total Time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="thought-live-chars">0</div>
+          <div class="stat-label">Characters</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value thought-folder-stat" id="thought-active-folder-label">Brain /</div>
+          <div class="stat-label">Target Folder</div>
+        </div>
+      </div>
+
+      <div class="passage-card" style="margin-bottom: 1.5rem;">
+        <div class="passage-meta">
+          <span><strong>Typing Thoughts</strong> &mdash; Type a thought and press <code>Enter</code> to push as <code>.md</code> (<code>Shift+Enter</code> for newline)</span>
+          <span class="badge-tag" id="brain-encryption-badge">AES-256-GCM Local Encrypted</span>
+        </div>
+
+        <div class="thought-composer-header">
+          <input type="text" id="thought-filename-input" placeholder="Optional filename (auto-named .md if blank)" aria-label="Optional markdown filename">
+          <button id="push-thought-btn" class="btn">Push Thought (Enter)</button>
+        </div>
+
+        <textarea id="thought-input" class="thought-textarea" placeholder="Start typing your thought... Timer starts on first keystroke. Press Enter to push to your Brain."></textarea>
+        <div class="focus-notice" id="thought-status-hint">Ready &mdash; start typing to measure WPM and time</div>
+      </div>
+
+      <!-- BRAIN SECTION -->
+      <div class="passage-card" id="brain-section">
+        <div class="brain-toolbar">
+          <div>
+            <h2>Brain Explorer</h2>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 0.2rem;">
+              Locally encrypted <code>.md</code> thoughts. Drag thoughts onto any folder in the tree to organize.
+            </p>
+          </div>
+          <div class="brain-actions">
+            <input type="text" id="new-folder-input" placeholder="New folder name..." aria-label="New folder name">
+            <button id="create-folder-btn" class="btn btn-secondary">+ Add Folder</button>
+            <button id="export-brain-zip-btn" class="btn">Export Brain (.zip)</button>
+          </div>
+        </div>
+
+        <div class="brain-layout">
+          <aside class="brain-sidebar" aria-label="Brain folder structure explorer">
+            <div class="brain-sidebar-title">Folders &amp; Files</div>
+            <div id="brain-explorer-tree" class="folder-tree"></div>
+          </aside>
+
+          <div class="brain-main">
+            <div class="brain-main-header">
+              <span id="brain-current-path-heading">Brain / (All Thoughts)</span>
+              <span id="brain-thought-count" style="color: var(--text-muted); font-size: 0.8rem;">0 thoughts</span>
+            </div>
+            <div id="brain-thoughts-list" class="thoughts-list"></div>
+          </div>
+        </div>
       </div>
     </section>
 

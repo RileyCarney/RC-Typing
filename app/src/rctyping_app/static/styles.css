@@ -403,6 +403,301 @@ textarea:focus {
   border-color: var(--accent);
 }
 
+/* Typing Thoughts & Brain Explorer */
+.thought-folder-stat {
+  font-size: 1rem;
+  line-height: 1.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thought-composer-header {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.thought-composer-header input[type="text"] {
+  flex: 1;
+}
+
+.thought-textarea {
+  width: 100%;
+  min-height: 120px;
+  height: 120px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  line-height: 1.6;
+  padding: 0.85rem 1rem;
+  resize: vertical;
+  outline: none;
+}
+
+.thought-textarea:focus {
+  border-color: var(--accent);
+}
+
+.brain-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.brain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.brain-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .brain-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brain-sidebar {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  min-height: 300px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.brain-sidebar-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.folder-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tree-folder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding: 0.38rem 0.5rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+  color: var(--text-main);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.tree-folder-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tree-folder-row.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: var(--accent);
+}
+
+.tree-folder-row.drag-over {
+  background: rgba(56, 189, 248, 0.22);
+  border: 1px dashed var(--accent);
+}
+
+.tree-folder-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.tree-folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-folder-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 0.25rem;
+  border-radius: 0.2rem;
+}
+
+.tree-folder-delete:hover {
+  color: var(--error);
+}
+
+.tree-children {
+  margin-left: 1rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tree-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 0.3rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tree-file-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+}
+
+.tree-file-item.dragging {
+  opacity: 0.45;
+}
+
+.brain-main {
+  min-width: 0;
+}
+
+.brain-main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.thoughts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.thought-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.9rem 1rem;
+  cursor: grab;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.thought-card:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.thought-card.dragging {
+  opacity: 0.45;
+}
+
+.thought-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.thought-filename {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.thought-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.78rem;
+}
+
+.thought-pill {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+.thought-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-main);
+  margin-bottom: 0.65rem;
+}
+
+.thought-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.78rem;
+}
+
+.thought-move-select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.btn-xs {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+  border-radius: 0.3rem;
+}
+
+.btn-danger {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--error);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.btn-danger:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+
 .footer {
   text-align: center;
   padding: 1.5rem;
