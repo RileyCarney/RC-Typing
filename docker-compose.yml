@@ -1,0 +1,41 @@
+name: rc-typing
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: rc-typing-app:latest
+    container_name: rc-typing-app
+    ports:
+      - "8000:8000"
+    environment:
+      - RCTYPING_HOST=0.0.0.0
+      - RCTYPING_PORT=8000
+      - RCTYPING_REGISTRY_URL=http://registry:8001
+      - RCTYPING_PUBLISH_DEFAULT=true
+    volumes:
+      - app-data:/data
+    depends_on:
+      - registry
+    restart: unless-stopped
+
+  registry:
+    build:
+      context: .
+      dockerfile: registry/Dockerfile
+    image: rc-typing-registry:latest
+    container_name: rc-typing-registry
+    ports:
+      - "8001:8001"
+    environment:
+      - RCTYPING_REGISTRY_HOST=0.0.0.0
+      - RCTYPING_REGISTRY_PORT=8001
+      - RCTYPING_REGISTRY_ADMIN_TOKEN=secret-admin-token
+    volumes:
+      - registry-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  registry-data:

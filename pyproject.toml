@@ -1,0 +1,33 @@
+[project]
+name = "rc-typing-workspace"
+version = "0.1.0"
+description = "Monorepo workspace for rc-typing"
+requires-python = ">=3.12"
+dependencies = [
+    "rctyping-common",
+    "rctyping-app",
+    "rctyping-registry",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/rctyping_common",
+    "app",
+    "registry",
+]
+
+[tool.uv.sources]
+rctyping-common = { workspace = true }
+rctyping-app = { workspace = true }
+rctyping-registry = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "packages/rctyping_common/tests", "app/tests", "registry/tests"]
+pythonpath = [".", "packages/rctyping_common/src", "app/src", "registry/src"]

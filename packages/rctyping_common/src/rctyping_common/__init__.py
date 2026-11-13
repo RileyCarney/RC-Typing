@@ -1,0 +1,71 @@
+"""rctyping_common: Shared crypto, Merkle tree, canonical JSON, and models."""
+
+from rctyping_common.canonical import canonical_json_dumps, canonical_json_hash
+from rctyping_common.certificate import (
+    b64url_decode,
+    b64url_encode,
+    calculate_key_id,
+    generate_keypair,
+    private_key_from_pem,
+    private_key_to_pem,
+    public_key_from_b64url,
+    public_key_from_pem,
+    public_key_to_b64url,
+    public_key_to_pem,
+    sign_certificate,
+    verify_certificate_envelope,
+)
+from rctyping_common.corpus import CorpusRepository, Passage
+from rctyping_common.merkle import (
+    MerkleTree,
+    leaf_hash,
+    node_hash,
+    verify_consistency_proof,
+    verify_inclusion_proof,
+)
+from rctyping_common.models import (
+    CertificateEnvelope,
+    CertificatePayload,
+    InclusionProof,
+    KeystrokeEvent,
+    Metrics,
+    RegistryReceipt,
+    SignedTreeHead,
+    TrustTier,
+    VerificationResult,
+    sanitize_display_name,
+)
+
+__all__ = [
+    "canonical_json_dumps",
+    "canonical_json_hash",
+    "generate_keypair",
+    "calculate_key_id",
+    "sign_certificate",
+    "verify_certificate_envelope",
+    "public_key_to_pem",
+    "public_key_from_pem",
+    "public_key_to_b64url",
+    "public_key_from_b64url",
+    "private_key_to_pem",
+    "private_key_from_pem",
+    "b64url_encode",
+    "b64url_decode",
+    "MerkleTree",
+    "leaf_hash",
+    "node_hash",
+    "verify_inclusion_proof",
+    "verify_consistency_proof",
+    "CorpusRepository",
+    "Passage",
+    "CertificatePayload",
+    "CertificateEnvelope",
+    "Metrics",
+    "KeystrokeEvent",
+    "TrustTier",
+    "InclusionProof",
+    "SignedTreeHead",
+    "RegistryReceipt",
+    "VerificationResult",
+    "sanitize_display_name",
+]

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rc-typing | Verifiable Speed Across Thought</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>rc-typing</h1>
+      <span class="badge-tag">Ed25519 Verified</span>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-tab="test">Typing Test</button>
+      <button class="nav-btn" data-tab="verify">Verify Certificate</button>
+      <button class="nav-btn" data-tab="stats">Stats & History</button>
+      <button class="nav-btn" data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TAB 1: TYPING TEST -->
+    <section id="tab-test" class="tab-content active">
+      <div class="controls-bar">
+        <div class="category-group">
+          <label for="category-select">Category of Thought:</label>
+          <select id="category-select">
+            <option value="code">Programming Code</option>
+            <option value="prose">Prose & Literature</option>
+            <option value="reading">Reading & Encyclopedic</option>
+            <option value="technical">Technical & Scientific</option>
+            <option value="formal">Formal & Legal</option>
+            <option value="conversational">Conversational Dialogue</option>
+          </select>
+
+          <div id="language-group">
+            <label for="language-select">Language:</label>
+            <select id="language-select">
+              <option value="python">Python</option>
+              <option value="powershell">PowerShell</option>
+              <option value="cpp">C++</option>
+              <option value="csharp">C#</option>
+              <option value="javascript">JavaScript</option>
+              <option value="typescript">TypeScript</option>
+              <option value="sql">SQL</option>
+            </select>
+          </div>
+        </div>
+
+        <button id="new-passage-btn" class="btn">New Passage (Tab + Enter)</button>
+      </div>
+
+      <!-- Live Stats -->
+      <div class="live-stats">
+        <div class="stat-card">
+          <div class="stat-value" id="live-wpm">0</div>
+          <div class="stat-label">Net WPM</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="live-accuracy">100%</div>
+          <div class="stat-label">Accuracy</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="live-time">0.0s</div>
+          <div class="stat-label">Time</div>
+        </div>
+      </div>
+
+      <!-- Passage Viewport -->
+      <div class="passage-card" id="passage-container">
+        <div class="passage-meta">
+          <span id="passage-title">Loading passage...</span>
+          <span id="passage-license">License: MIT</span>
+        </div>
+
+        <div id="typing-viewport" class="typing-viewport" tabindex="0"></div>
+
+        <div class="focus-notice" id="focus-hint">Click inside or start typing to begin test</div>
+      </div>
+    </section>
+
+    <!-- TAB 2: VERIFY CERTIFICATE -->
+    <section id="tab-verify" class="tab-content">
+      <div class="passage-card">
+        <h2>Cryptographic Certificate Verifier</h2>
+        <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem 0; font-size: 0.9rem;">
+          Mathematically verify Ed25519 digital signatures on rc-typing certificate JSON files and check Merkle transparency log inclusion proofs against the shared public registry.
+        </p>
+
+        <label for="cert-json-input" style="display:block; margin-bottom:0.5rem;">Paste Certificate JSON or drop file:</label>
+        <textarea id="cert-json-input" placeholder='{"payload": {...}, "signature": "...", "issuer_public_key": "..."}'></textarea>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; align-items: center;">
+          <input type="file" id="cert-file-input" accept=".json" style="display: none;">
+          <button id="upload-cert-btn" class="btn btn-secondary">Upload .json</button>
+          <button id="run-verify-btn" class="btn">Verify Mathematical Signature</button>
+        </div>
+
+        <div id="verify-results" style="display: none; margin-top: 2rem;">
+          <hr style="border: 0; border-top: 1px solid var(--border); margin-bottom: 1.5rem;">
+          <h3>Verification Report</h3>
+          <div id="verify-badge-container" style="margin: 0.75rem 0;"></div>
+          <table id="verify-details-table">
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: STATS & HISTORY -->
+    <section id="tab-stats" class="tab-content">
+      <div class="passage-card">
+        <h2>Performance Across Categories of Thought</h2>
+        <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem 0; font-size: 0.9rem;">
+          Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
+        </p>
+        <div id="stats-container">
+          <p style="color: var(--text-muted);">Loading stats...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: SETTINGS -->
+    <section id="tab-settings" class="tab-content">
+      <div class="passage-card">
+        <h2>Application & Registry Settings</h2>
+        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 600px;">
+          <div>
+            <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: var(--text-main); font-size: 1rem;">
+              <input type="checkbox" id="setting-auto-publish" style="width: 1.2rem; height: 1.2rem;">
+              <strong>Auto-publish certificates to Public Registry (Default: Enabled)</strong>
+            </label>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.4rem 0 0 2rem;">
+              When enabled, signed certificate envelopes are submitted to the transparency log. Your keystrokes remain private on your machine; only their cryptographic SHA-256 hash and metrics are published.
+            </p>
+          </div>
+
+          <div>
+            <label for="setting-default-name" style="display:block; margin-bottom:0.4rem;">Default Certificate Display Name:</label>
+            <input type="text" id="setting-default-name" style="width: 100%;" placeholder="e.g. Satoshi Typist">
+            <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem;">
+              Free-form label included in signed certificates. Stripped of control and bidi-override characters.
+            </p>
+          </div>
+
+          <div>
+            <label for="setting-registry-url" style="display:block; margin-bottom:0.4rem;">Public Registry URL:</label>
+            <input type="text" id="setting-registry-url" style="width: 100%;" placeholder="http://localhost:8001">
+          </div>
+
+          <div>
+            <button id="save-settings-btn" class="btn">Save Settings</button>
+            <span id="settings-status" style="margin-left: 1rem; font-size: 0.85rem; color: var(--correct);"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- CERTIFICATE RESULT MODAL -->
+  <div class="modal-overlay" id="cert-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Cryptographic Certificate Issued</h2>
+        <button id="close-modal-btn" class="btn btn-secondary" style="padding: 0.3rem 0.7rem;">&times;</button>
+      </div>
+
+      <div id="modal-status-badge"></div>
+
+      <div class="cert-grid">
+        <div class="cert-field">
+          <div class="lbl">Subject Name</div>
+          <div class="val" id="cert-val-subject">-</div>
+        </div>
+        <div class="cert-field">
+          <div class="lbl">Category / Language</div>
+          <div class="val" id="cert-val-cat">-</div>
+        </div>
+        <div class="cert-field">
+          <div class="lbl">Net Speed</div>
+          <div class="val" id="cert-val-netwpm">0 WPM</div>
+        </div>
+        <div class="cert-field">
+          <div class="lbl">Accuracy</div>
+          <div class="val" id="cert-val-acc">100%</div>
+        </div>
+        <div class="cert-field">
+          <div class="lbl">Consistency</div>
+          <div class="val" id="cert-val-consistency">100%</div>
+        </div>
+        <div class="cert-field">
+          <div class="lbl">Duration</div>
+          <div class="val" id="cert-val-duration">0s</div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+        <div><strong>Certificate ID:</strong> <span id="cert-val-id" style="font-family: var(--font-mono);"></span></div>
+        <div style="margin-top: 0.25rem;"><strong>Issuer Key ID:</strong> <span id="cert-val-issuer" style="font-family: var(--font-mono); font-size: 0.75rem;"></span></div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="download-cert-btn" class="btn">Download Certificate (.json)</button>
+        <button id="view-in-verifier-btn" class="btn btn-secondary">Open in Verifier</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    rc-typing &bull; Standalone Containerized Benchmark &bull; RFC 8785 Canonical JSON &bull; Ed25519 &bull; RFC 6962 Transparency Log
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
