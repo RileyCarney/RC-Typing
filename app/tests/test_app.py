@@ -51,6 +51,43 @@ def test_compute_metrics_with_tab():
     assert metrics.raw_wpm >= metrics.net_wpm
 
 
+def test_tab_followed_by_backspaces_replay_and_metrics():
+    target = "def foo():\n    return 42"
+    events = []
+    t = 0
+    for ch in "def foo():\n":
+        key = "Enter" if ch == "\n" else ch
+        events.append(KeystrokeEvent(t_ms=t, key=key, type="keydown"))
+        t += 100
+    events.append(KeystrokeEvent(t_ms=t, key="Tab", type="keydown"))
+    t += 100
+    for _ in range(4):
+        events.append(KeystrokeEvent(t_ms=t, key="Backspace", type="keydown"))
+        t += 100
+    events.append(KeystrokeEvent(t_ms=t, key="Tab", type="keydown"))
+    t += 100
+    for ch in "return 42":
+        events.append(KeystrokeEvent(t_ms=t, key=ch, type="keydown"))
+        t += 100
+
+    metrics, text = compute_metrics(target, events, server_duration_ms=t)
+    assert text == target
+    assert metrics.chars_correct == len(target)
+    assert metrics.chars_incorrect == 0
+    assert metrics.accuracy == 1.0
+
+    # Partial backspace after Tab removes one space per Backspace, not all 4 at once
+    partial_events = [
+        KeystrokeEvent(t_ms=0, key="a", type="keydown"),
+        KeystrokeEvent(t_ms=100, key="Enter", type="keydown"),
+        KeystrokeEvent(t_ms=200, key="Tab", type="keydown"),
+        KeystrokeEvent(t_ms=300, key="Backspace", type="keydown"),
+        KeystrokeEvent(t_ms=400, key="Backspace", type="keydown"),
+        KeystrokeEvent(t_ms=500, key="b", type="keydown"),
+    ]
+    assert replay_keystrokes(partial_events) == "a\n  b"
+
+
 def test_anticheat_heuristics():
     # 1. Untrusted events
     untrusted = [
@@ -138,6 +175,52 @@ def test_api_session_lifecycle_and_certificate():
         assert stats_resp.status_code == 200
         stats = stats_resp.json()
         assert stats["total_certificates"] >= 1
+
+
+def test_session_start_resets_idle_clock_for_clean_integrity():
+    import datetime
+    from rctyping_app.db.models import SessionModel
+    from rctyping_app.db.session import get_app_session
+
+    with TestClient(app) as client:
+        resp = client.post("/api/sessions", json={"category": "code", "language": "python"})
+        assert resp.status_code == 200
+        sess_data = resp.json()
+        session_id = sess_data["session_id"]
+        target_text = sess_data["passage"]["text"]
+
+        # Simulate 2 minutes of idle time before the user types their first keystroke
+        with get_app_session() as db:
+            db_sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+            assert db_sess is not None
+            db_sess.started_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=120)
+            db.commit()
+
+        start_resp = client.post(f"/api/sessions/{session_id}/start")
+        assert start_resp.status_code == 200
+        assert start_resp.json() == {"status": "started"}
+
+        # Type a prefix with realistic human jitter (~2s total, well within skew allowance)
+        sample = target_text[:30]
+        events = []
+        t = 0
+        for idx, ch in enumerate(sample):
+            key = "Enter" if ch == "\n" else ch
+            events.append({"t_ms": t, "key": key, "type": "keydown", "is_trusted": True})
+            dwell = 15 + (idx % 4) * 5
+            events.append({"t_ms": t + dwell, "key": key, "type": "keyup", "is_trusted": True})
+            t += 45 if idx % 2 == 0 else 95
+
+        expected_duration_ms = events[-2]["t_ms"] - events[0]["t_ms"]
+        finish_resp = client.post(
+            f"/api/sessions/{session_id}/finish",
+            json={"events": events, "subject_name": "Idle Test Typist"},
+        )
+        assert finish_resp.status_code == 200
+        cert_payload = finish_resp.json()["certificate"]["payload"]
+        assert cert_payload["integrity"] == "clean"
+        assert cert_payload["metrics"]["duration_ms"] == expected_duration_ms
+        assert cert_payload["metrics"]["accuracy"] == 1.0
 
 
 def test_favicon_served():

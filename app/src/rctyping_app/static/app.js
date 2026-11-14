@@ -6,6 +6,7 @@ let keyEvents = [];
 let typedChars = [];
 let isTestActive = false;
 let startTime = null;
+let sessionStartPromise = null;
 let liveInterval = null;
 let latestCertificate = null;
 
@@ -108,6 +109,7 @@ async function loadNewPassage() {
 function resetTestState() {
   isTestActive = false;
   startTime = null;
+  sessionStartPromise = null;
   keyEvents = [];
   typedChars = [];
   if (liveInterval) clearInterval(liveInterval);
@@ -144,6 +146,9 @@ function handleKeyDown(e) {
     isTestActive = true;
     startTime = now;
     liveInterval = setInterval(updateLiveStats, 100);
+    if (currentSession) {
+      sessionStartPromise = fetch(`/api/sessions/${currentSession}/start`, { method: 'POST' }).catch(() => {});
+    }
   }
 
   const offsetMs = Math.round(now - startTime);
@@ -236,12 +241,14 @@ function updateLiveStats() {
 
 // --- Finish Test & Submit ---
 async function finishTest() {
+  updateLiveStats();
   if (liveInterval) clearInterval(liveInterval);
   isTestActive = false;
 
   focusHint.innerText = 'Submitting keystroke log for mathematical verification...';
 
   try {
+    if (sessionStartPromise) await sessionStartPromise;
     const res = await fetch(`/api/sessions/${currentSession}/finish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -254,6 +261,9 @@ async function finishTest() {
     if (!res.ok) throw new Error(await res.text());
 
     const result = await res.json();
+    liveWpm.innerText = Math.round(result.metrics.net_wpm);
+    liveAcc.innerText = `${(result.metrics.accuracy * 100).toFixed(1)}%`;
+    liveTime.innerText = `${(result.metrics.duration_ms / 1000).toFixed(1)}s`;
     latestCertificate = result.certificate;
     showCertificateModal(result);
   } catch (err) {

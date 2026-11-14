@@ -51,3 +51,12 @@ class SessionService:
             .filter(SessionModel.id == session_id, SessionModel.user_id == user_id)
             .first()
         )
+
+    def mark_session_started(self, session_id: str, user_id: str) -> Optional[SessionModel]:
+        session = self.get_session(session_id, user_id)
+        if not session or session.status != "in_progress":
+            return None
+        session.started_at = datetime.datetime.now(datetime.timezone.utc)
+        self.db.commit()
+        self.db.refresh(session)
+        return session

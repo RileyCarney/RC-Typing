@@ -20,7 +20,7 @@ def replay_keystrokes(events: List[KeystrokeEvent]) -> str:
         elif key == "Enter":
             buffer.append("\n")
         elif key == "Tab":
-            buffer.append("    ")
+            buffer.extend("    ")
         elif len(key) == 1:
             buffer.append(key)
     return "".join(buffer)
@@ -87,7 +87,7 @@ def compute_metrics(
     raw_wpm = round((chars_total / 5.0) / duration_minutes, 1)
 
     # Accuracy ratio bounded strictly between 0.0 and 1.0
-    raw_accuracy = chars_correct / max(1, chars_total)
+    raw_accuracy = chars_correct / max(1, len(reconstructed))
     accuracy = round(max(0.0, min(1.0, raw_accuracy)), 3)
 
     # Inter-key intervals (IKIs) for consistency calculation

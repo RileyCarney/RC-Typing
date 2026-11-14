@@ -132,6 +132,20 @@ def start_session(
     )
 
 
+@router.post("/sessions/{session_id}/start")
+def start_session_typing(
+    session_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+    corpus_repo: CorpusRepository = Depends(get_corpus_repo),
+):
+    service = SessionService(db, corpus_repo)
+    session = service.mark_session_started(session_id, user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "started"}
+
+
 @router.post("/sessions/{session_id}/finish", response_model=FinishSessionResponse)
 def finish_session(
     session_id: str,
