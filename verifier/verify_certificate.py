@@ -153,25 +153,36 @@ def verify_certificate(cert_path: str, pubkey_path: Optional[str] = None, regist
                 print(f"[OK] Record found in transparency log at leaf index {reg_data.get('leaf_index')}.")
                 print(f"     Issuer trust tier: {reg_data.get('trust_tier')}")
 
-                if reg_data.get("is_revoked"):
-                    print(f"     [!] WARNING: This certificate was REVOKED: {reg_data.get('revocation_reason')}")
+                local_envelope_bytes = canonical_json_dumps(envelope)
+                reg_envelope_bytes = canonical_json_dumps(reg_data.get("envelope", {}))
+                if reg_envelope_bytes != local_envelope_bytes:
+                    print("[FAIL] Registry envelope does not match local certificate.", file=sys.stderr)
+                    return False
 
-                # Verify inclusion proof
-                envelope_bytes = canonical_json_dumps(reg_data["envelope"])
                 proof = reg_data.get("inclusion_proof", {})
                 head = reg_data.get("signed_tree_head", {})
-                if proof and head:
-                    inc_valid = verify_merkle_inclusion(
-                        leaf_data=envelope_bytes,
-                        leaf_index=proof["leaf_index"],
-                        tree_size=proof["tree_size"],
-                        audit_path=proof["audit_path"],
-                        expected_root_hex=head["root_hash"],
+                if not proof or not head:
+                    print("[FAIL] Registry response missing inclusion proof or signed tree head.", file=sys.stderr)
+                    return False
+
+                inc_valid = verify_merkle_inclusion(
+                    leaf_data=local_envelope_bytes,
+                    leaf_index=proof["leaf_index"],
+                    tree_size=proof["tree_size"],
+                    audit_path=proof["audit_path"],
+                    expected_root_hex=head["root_hash"],
+                )
+                if not inc_valid:
+                    print("[FAIL] RFC 6962 Merkle inclusion proof FAILED.", file=sys.stderr)
+                    return False
+                print("     [OK] RFC 6962 Merkle inclusion proof verified against signed tree root.")
+
+                if reg_data.get("is_revoked"):
+                    print(
+                        f"[FAIL] This certificate was REVOKED: {reg_data.get('revocation_reason')}",
+                        file=sys.stderr,
                     )
-                    if inc_valid:
-                        print("     [OK] RFC 6962 Merkle inclusion proof verified against signed tree root.")
-                    else:
-                        print("     [!] Merkle inclusion proof FAILED.")
+                    return False
         except urllib.error.HTTPError as err:
             if err.code == 404:
                 print(f"     [Note] Certificate valid offline, but not present in this registry.")

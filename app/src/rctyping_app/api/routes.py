@@ -8,7 +8,7 @@ import re
 import uuid
 import zipfile
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -16,21 +16,14 @@ from rctyping_app.core.keystore import KeyStore
 from rctyping_app.db.models import (
     CertificateModel,
     PublishJobModel,
-    SessionModel,
     ThoughtFolderModel,
     ThoughtModel,
-    UserModel,
     UserSettingsModel,
 )
 from rctyping_app.db.session import DEFAULT_USER_ID, get_db
 from rctyping_app.services.certificate_service import CertificateService
 from rctyping_app.services.session_service import SessionService
-from rctyping_common.certificate import (
-    calculate_key_id,
-    public_key_from_b64url,
-    public_key_from_pem,
-    verify_certificate_envelope,
-)
+from rctyping_common.certificate import verify_certificate_envelope
 from rctyping_common.corpus import CorpusRepository
 from rctyping_common.models import (
     CertificateEnvelope,
@@ -203,20 +196,30 @@ def download_certificate(cert_id: str, db: Session = Depends(get_db)):
 
 @router.post("/certificates/{cert_id}/publish")
 def retry_publish(cert_id: str, db: Session = Depends(get_db)):
+    cert = db.query(CertificateModel).filter(CertificateModel.id == cert_id).first()
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    now = datetime.datetime.now(datetime.timezone.utc)
     job = db.query(PublishJobModel).filter(PublishJobModel.cert_id == cert_id).first()
     if not job:
-        job = PublishJobModel(cert_id=cert_id, state="pending")
+        job = PublishJobModel(cert_id=cert_id, state="pending", next_attempt_at=now)
         db.add(job)
     else:
         job.state = "pending"
         job.attempts = 0
+        job.next_attempt_at = now
+    cert.registry_status = "pending"
     db.commit()
     return {"status": "publish_queued"}
 
 
 @router.get("/stats")
 def get_stats(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db)):
-    certs = db.query(CertificateModel).filter(CertificateModel.user_id == user_id).all()
+    certs = (
+        db.query(CertificateModel)
+        .filter(CertificateModel.user_id == user_id, CertificateModel.integrity == "clean")
+        .all()
+    )
     categories_stats: Dict[str, Any] = {}
 
     for c in certs:
@@ -227,7 +230,6 @@ def get_stats(user_id: str = Depends(get_current_user_id), db: Session = Depends
                 "language": c.language,
                 "tests_completed": 0,
                 "best_net_wpm": 0.0,
-                "best_raw_wpm": 0.0,
                 "total_wpm": 0.0,
                 "total_accuracy": 0.0,
             }
@@ -398,14 +400,28 @@ def build_thought_markdown(
     )
 
 
+def _utc_iso(dt: datetime.datetime) -> str:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.isoformat()
+
+
 def _serialize_thought(
     thought: ThoughtModel,
     folders_by_id: Dict[str, ThoughtFolderModel],
     keystore: KeyStore,
 ) -> Dict[str, Any]:
     content = keystore.decrypt_text(thought.encrypted_content)
-    markdown = keystore.decrypt_text(thought.encrypted_markdown)
     folder_path = resolve_folder_path(thought.folder_id, folders_by_id)
+    created_at_iso = _utc_iso(thought.created_at)
+    markdown = build_thought_markdown(
+        filename=thought.filename,
+        content=content,
+        wpm=thought.wpm,
+        duration_ms=thought.duration_ms,
+        folder_path=folder_path,
+        created_at_iso=created_at_iso,
+    )
     return {
         "id": thought.id,
         "filename": thought.filename,
@@ -418,7 +434,7 @@ def _serialize_thought(
         "total_time": format_duration_human(thought.duration_ms),
         "chars_typed": thought.chars_typed,
         "encryption_alg": thought.encryption_alg,
-        "created_at": thought.created_at.isoformat(),
+        "created_at": created_at_iso,
     }
 
 
@@ -545,15 +561,6 @@ def push_thought(
     )
     filename = slugify_filename(content, req.filename)
     created_at = datetime.datetime.now(datetime.timezone.utc)
-    folder_path = resolve_folder_path(folder_id, folders_by_id)
-    markdown = build_thought_markdown(
-        filename=filename,
-        content=content,
-        wpm=computed_wpm,
-        duration_ms=req.duration_ms,
-        folder_path=folder_path,
-        created_at_iso=created_at.isoformat(),
-    )
 
     thought = ThoughtModel(
         user_id=user_id,
@@ -563,7 +570,6 @@ def push_thought(
         duration_ms=req.duration_ms,
         chars_typed=chars_typed,
         encrypted_content=keystore.encrypt_text(content),
-        encrypted_markdown=keystore.encrypt_text(markdown),
         encryption_alg="AES-256-GCM",
         created_at=created_at,
     )
@@ -574,7 +580,6 @@ def push_thought(
 
 
 @router.patch("/thoughts/{thought_id}")
-@router.put("/thoughts/{thought_id}/move")
 def update_thought(
     thought_id: str,
     req: UpdateThoughtRequest,
@@ -600,20 +605,10 @@ def update_thought(
             raise HTTPException(status_code=404, detail="Target folder not found")
         thought.folder_id = req.folder_id
 
-    content = keystore.decrypt_text(thought.encrypted_content)
     if req.filename is not None:
+        content = keystore.decrypt_text(thought.encrypted_content)
         thought.filename = slugify_filename(content, req.filename)
 
-    folder_path = resolve_folder_path(thought.folder_id, folders_by_id)
-    updated_md = build_thought_markdown(
-        filename=thought.filename,
-        content=content,
-        wpm=thought.wpm,
-        duration_ms=thought.duration_ms,
-        folder_path=folder_path,
-        created_at_iso=thought.created_at.isoformat(),
-    )
-    thought.encrypted_markdown = keystore.encrypt_text(updated_md)
     db.commit()
     db.refresh(thought)
     return _serialize_thought(thought, folders_by_id, keystore)
@@ -671,7 +666,15 @@ def export_thoughts_zip(
                     else f"{stem}-{t.id[:6]}.md"
                 )
             used_paths.add(rel_path)
-            markdown = keystore.decrypt_text(t.encrypted_markdown)
+            content = keystore.decrypt_text(t.encrypted_content)
+            markdown = build_thought_markdown(
+                filename=t.filename,
+                content=content,
+                wpm=t.wpm,
+                duration_ms=t.duration_ms,
+                folder_path=folder_path,
+                created_at_iso=_utc_iso(t.created_at),
+            )
             zf.writestr(rel_path, markdown.encode("utf-8"))
 
     buf.seek(0)

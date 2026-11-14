@@ -26,6 +26,9 @@ def evaluate_keystroke_integrity(
     if not keydown_events:
         return "flagged", ["no_events"]
 
+    if len(keydown_events) < 10:
+        flags.append("insufficient_events")
+
     # 1. Untrusted browser events (synthetic script dispatch)
     if any(not e.is_trusted for e in events):
         flags.append("untrusted_browser_event")
@@ -43,7 +46,7 @@ def evaluate_keystroke_integrity(
         if delta >= 0:
             ikis.append(float(delta))
 
-    if len(ikis) >= 10:
+    if ikis:
         mean_iki = sum(ikis) / len(ikis)
         variance = sum((x - mean_iki) ** 2 for x in ikis) / len(ikis)
         stddev_iki = math.sqrt(variance)

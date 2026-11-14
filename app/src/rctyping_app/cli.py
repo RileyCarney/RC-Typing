@@ -12,10 +12,12 @@ import httpx
 
 from rctyping_app.config import settings
 from rctyping_app.core.keystore import KeyStore
+from rctyping_common.canonical import canonical_json_dumps
 from rctyping_common.certificate import (
     public_key_from_pem,
     verify_certificate_envelope,
 )
+from rctyping_common.merkle import verify_inclusion_proof
 from rctyping_common.models import CertificateEnvelope
 
 
@@ -88,13 +90,39 @@ def cmd_verify(args: argparse.Namespace) -> None:
     if reg_url:
         print(f"\nChecking public registry at {reg_url}...")
         try:
-            resp = httpx.get(f"{reg_url}/v1/certificates/{p.cert_id}", timeout=5.0)
+            resp = httpx.get(f"{reg_url.rstrip('/')}/v1/certificates/{p.cert_id}", timeout=5.0)
             if resp.status_code == 200:
                 reg_data = resp.json()
                 print(f"[OK] Certificate is recorded in transparency log at leaf index {reg_data.get('leaf_index')}.")
                 print(f"     Issuer trust tier: {reg_data.get('trust_tier', 'unverified')}")
+
+                local_envelope_bytes = canonical_json_dumps(envelope.model_dump())
+                reg_envelope_bytes = canonical_json_dumps(reg_data.get("envelope", {}))
+                if reg_envelope_bytes != local_envelope_bytes:
+                    print("[!] Registry envelope does not match local certificate.", file=sys.stderr)
+                    sys.exit(2)
+
+                proof = reg_data.get("inclusion_proof") or {}
+                head = reg_data.get("signed_tree_head") or {}
+                if not proof or not head:
+                    print("[!] Registry response missing inclusion proof or signed tree head.", file=sys.stderr)
+                    sys.exit(2)
+
+                inc_valid = verify_inclusion_proof(
+                    leaf_data=local_envelope_bytes,
+                    leaf_index=proof["leaf_index"],
+                    tree_size=proof["tree_size"],
+                    audit_path=proof["audit_path"],
+                    expected_root_hex=head["root_hash"],
+                )
+                if not inc_valid:
+                    print("[!] Merkle inclusion proof FAILED.", file=sys.stderr)
+                    sys.exit(2)
+                print("     [OK] RFC 6962 Merkle inclusion proof verified against signed tree root.")
+
                 if reg_data.get("is_revoked"):
-                    print("     [!] WARNING: This certificate has been REVOKED.")
+                    print(f"[!] WARNING: This certificate has been REVOKED: {reg_data.get('revocation_reason')}", file=sys.stderr)
+                    sys.exit(2)
             elif resp.status_code == 404:
                 print("     [Note] Certificate is valid offline, but not published in this registry.")
             else:

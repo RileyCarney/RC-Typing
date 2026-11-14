@@ -47,13 +47,16 @@ def create_registry_app() -> FastAPI:
     def get_registry_info():
         if registry_keystore is None or registry_log_service is None:
             return Response("Registry initializing", status_code=503)
+        with registry_log_service._lock:
+            tree_size = registry_log_service.tree.size
+            tree_root_hex = registry_log_service.tree.root_hex()
         return {
             "name": "rc-typing public registry",
             "version": "0.1.0",
             "registry_key_id": registry_keystore.key_id,
             "registry_public_key_b64": registry_keystore.get_public_key_b64(),
-            "tree_size": registry_log_service.tree.size,
-            "tree_root_hex": registry_log_service.tree.root_hex(),
+            "tree_size": tree_size,
+            "tree_root_hex": tree_root_hex,
         }
 
     @app.get("/", response_class=HTMLResponse)

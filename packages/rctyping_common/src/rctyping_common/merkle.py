@@ -35,14 +35,21 @@ def node_hash(left: bytes, right: bytes) -> bytes:
 class MerkleTree:
     """In-memory RFC 6962 Merkle Tree."""
 
-    def __init__(self, leaves: Sequence[bytes] | None = None) -> None:
-        self.raw_leaves: List[bytes] = list(leaves) if leaves else []
-        self.leaf_hashes: List[bytes] = [leaf_hash(l) for l in self.raw_leaves]
+    def __init__(
+        self,
+        leaves: Sequence[bytes] | None = None,
+        leaf_hashes: Sequence[bytes] | None = None,
+    ) -> None:
+        if leaf_hashes is not None:
+            self.leaf_hashes: List[bytes] = list(leaf_hashes)
+        elif leaves:
+            self.leaf_hashes = [leaf_hash(l) for l in leaves]
+        else:
+            self.leaf_hashes = []
 
     def append(self, data: bytes) -> int:
         """Append raw data leaf to tree, returns index of new leaf."""
-        idx = len(self.raw_leaves)
-        self.raw_leaves.append(data)
+        idx = len(self.leaf_hashes)
         self.leaf_hashes.append(leaf_hash(data))
         return idx
 
@@ -143,7 +150,10 @@ def verify_inclusion_proof(
     r0 = leaf_hash(leaf_data)
 
     for p in audit_path:
-        sibling = bytes.fromhex(p) if isinstance(p, str) else p
+        try:
+            sibling = bytes.fromhex(p) if isinstance(p, str) else p
+        except ValueError:
+            return False
         if sn == 0:
             return False
         if (fn & 1) or (fn == sn):
@@ -167,6 +177,8 @@ def verify_consistency_proof(
     consistency_path: Sequence[str | bytes],
 ) -> bool:
     """Verify RFC 6962 Section 2.1.4 consistency proof."""
+    if prior_size < 0 or current_size < 0:
+        return False
     if prior_size == 0:
         return True
     if prior_size == current_size:
@@ -174,7 +186,10 @@ def verify_consistency_proof(
     if prior_size > current_size:
         return False
 
-    path = [bytes.fromhex(p) if isinstance(p, str) else p for p in consistency_path]
+    try:
+        path = [bytes.fromhex(p) if isinstance(p, str) else p for p in consistency_path]
+    except ValueError:
+        return False
     if not path:
         return False
 
@@ -187,8 +202,11 @@ def verify_consistency_proof(
 
     path_idx = 0
     if fn == 0:
-        fr = bytes.fromhex(prior_root_hex)
-        sr = bytes.fromhex(prior_root_hex)
+        try:
+            fr = bytes.fromhex(prior_root_hex)
+            sr = bytes.fromhex(prior_root_hex)
+        except ValueError:
+            return False
     else:
         fr = path[path_idx]
         sr = path[path_idx]

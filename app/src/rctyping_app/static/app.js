@@ -9,6 +9,16 @@ let startTime = null;
 let sessionStartPromise = null;
 let liveInterval = null;
 let latestCertificate = null;
+let lastKeyWasTab = false;
+
+function escapeHtml(val) {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // DOM Elements
 const categorySelect = document.getElementById('category-select');
@@ -52,6 +62,27 @@ document.addEventListener('DOMContentLoaded', () => {
   closeModalBtn.addEventListener('click', () => certModal.classList.remove('open'));
   downloadCertBtn.addEventListener('click', downloadCurrentCertificate);
   viewInVerifierBtn.addEventListener('click', openCurrentInVerifier);
+
+  document.addEventListener('keydown', (e) => {
+    const testTabActive = document.getElementById('tab-test')?.classList.contains('active');
+    if (!testTabActive) return;
+    if (typingViewport.contains(e.target)) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target?.tagName)) {
+      lastKeyWasTab = false;
+      return;
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      lastKeyWasTab = true;
+    } else if (e.key === 'Enter' && lastKeyWasTab) {
+      e.preventDefault();
+      lastKeyWasTab = false;
+      certModal.classList.remove('open');
+      loadNewPassage();
+    } else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) {
+      lastKeyWasTab = false;
+    }
+  });
 
   setupVerifierTab();
 });
@@ -110,6 +141,7 @@ function resetTestState() {
   isTestActive = false;
   startTime = null;
   sessionStartPromise = null;
+  lastKeyWasTab = false;
   keyEvents = [];
   typedChars = [];
   if (liveInterval) clearInterval(liveInterval);
@@ -131,14 +163,29 @@ function renderPassageText(text) {
 
 // --- Keystroke Handling ---
 function handleKeyDown(e) {
+  if (!currentPassage) return;
+
   // Shortcut Tab + Enter for restart
   if (e.key === 'Tab') {
     e.preventDefault();
+    lastKeyWasTab = true;
+    if (!isTestActive && !currentPassage.text.startsWith('    ')) {
+      return;
+    }
+  } else if (e.key === 'Enter' && lastKeyWasTab) {
+    e.preventDefault();
+    lastKeyWasTab = false;
+    loadNewPassage();
+    return;
   }
 
   // Ignore navigation or modifier-only keys
   if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) {
     return;
+  }
+
+  if (e.key !== 'Tab') {
+    lastKeyWasTab = false;
   }
 
   const now = performance.now();
@@ -211,6 +258,7 @@ function handleKeyDown(e) {
 
 function handleKeyUp(e) {
   if (!isTestActive) return;
+  if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
   const now = performance.now();
   const offsetMs = Math.round(now - startTime);
   keyEvents.push({
@@ -286,10 +334,10 @@ function showCertificateModal(result) {
   const badgeBox = document.getElementById('modal-status-badge');
   badgeBox.innerHTML = `
     <span class="status-badge ${p.integrity === 'clean' ? 'badge-clean' : 'badge-flagged'}">
-      Integrity: ${p.integrity.toUpperCase()}
+      Integrity: ${escapeHtml(String(p.integrity || '').toUpperCase())}
     </span>
     <span class="status-badge badge-published" style="margin-left: 0.5rem;">
-      Registry: ${result.registry_status.toUpperCase()}
+      Registry: ${escapeHtml(String(result.registry_status || '').toUpperCase())}
     </span>
   `;
 
@@ -351,6 +399,11 @@ function setupVerifierTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(envelope)
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        alert(`Verification failed (HTTP ${res.status}): ${errText}`);
+        return;
+      }
       const data = await res.json();
       displayVerificationReport(data, envelope);
     } catch (err) {
@@ -373,17 +426,17 @@ function displayVerificationReport(report, envelope) {
   const m = p.metrics || {};
 
   tbody.innerHTML = `
-    <tr><td><strong>Status</strong></td><td>${report.status}</td></tr>
-    <tr><td><strong>Subject Name</strong></td><td>${p.subject || '-'} <em>(self-asserted)</em></td></tr>
-    <tr><td><strong>Category</strong></td><td>${p.category || '-'} ${p.language ? `(${p.language})` : ''}</td></tr>
-    <tr><td><strong>Net Speed</strong></td><td><strong>${m.net_wpm ?? '-'} WPM</strong></td></tr>
-    <tr><td><strong>Accuracy</strong></td><td>${m.accuracy ? (m.accuracy * 100).toFixed(1) + '%' : '-'}</td></tr>
-    <tr><td><strong>Consistency</strong></td><td>${m.consistency ? Math.round(m.consistency * 100) + '%' : '-'}</td></tr>
-    <tr><td><strong>Duration</strong></td><td>${m.duration_ms ? (m.duration_ms / 1000).toFixed(1) + 's' : '-'}</td></tr>
-    <tr><td><strong>Integrity Heuristic</strong></td><td>${p.integrity || '-'}</td></tr>
-    <tr><td><strong>Certificate ID</strong></td><td><code>${p.cert_id || '-'}</code></td></tr>
-    <tr><td><strong>Issuer Key ID</strong></td><td><code>${p.issuer_id || '-'}</code></td></tr>
-    <tr><td><strong>Details</strong></td><td>${report.details}</td></tr>
+    <tr><td><strong>Status</strong></td><td>${escapeHtml(report.status)}</td></tr>
+    <tr><td><strong>Subject Name</strong></td><td>${escapeHtml(p.subject || '-')} <em>(self-asserted)</em></td></tr>
+    <tr><td><strong>Category</strong></td><td>${escapeHtml(p.category || '-')} ${p.language ? `(${escapeHtml(p.language)})` : ''}</td></tr>
+    <tr><td><strong>Net Speed</strong></td><td><strong>${escapeHtml(m.net_wpm ?? '-')} WPM</strong></td></tr>
+    <tr><td><strong>Accuracy</strong></td><td>${m.accuracy != null ? escapeHtml((m.accuracy * 100).toFixed(1) + '%') : '-'}</td></tr>
+    <tr><td><strong>Consistency</strong></td><td>${m.consistency != null ? escapeHtml(Math.round(m.consistency * 100) + '%') : '-'}</td></tr>
+    <tr><td><strong>Duration</strong></td><td>${m.duration_ms != null ? escapeHtml((m.duration_ms / 1000).toFixed(1) + 's') : '-'}</td></tr>
+    <tr><td><strong>Integrity Heuristic</strong></td><td>${escapeHtml(p.integrity || '-')}</td></tr>
+    <tr><td><strong>Certificate ID</strong></td><td><code>${escapeHtml(p.cert_id || '-')}</code></td></tr>
+    <tr><td><strong>Issuer Key ID</strong></td><td><code>${escapeHtml(p.issuer_id || '-')}</code></td></tr>
+    <tr><td><strong>Details</strong></td><td>${escapeHtml(report.details)}</td></tr>
   `;
 }
 
@@ -404,17 +457,17 @@ async function loadStats() {
       const catLabel = s.language ? `${s.category} / ${s.language}` : s.category;
       rows += `
         <tr>
-          <td><strong>${catLabel}</strong></td>
-          <td>${s.tests_completed}</td>
-          <td><span style="color: var(--accent); font-weight: 600;">${s.best_net_wpm} WPM</span></td>
-          <td>${s.avg_net_wpm} WPM</td>
-          <td>${(s.avg_accuracy * 100).toFixed(1)}%</td>
+          <td><strong>${escapeHtml(catLabel)}</strong></td>
+          <td>${escapeHtml(s.tests_completed)}</td>
+          <td><span style="color: var(--accent); font-weight: 600;">${escapeHtml(s.best_net_wpm)} WPM</span></td>
+          <td>${escapeHtml(s.avg_net_wpm)} WPM</td>
+          <td>${escapeHtml((s.avg_accuracy * 100).toFixed(1))}%</td>
         </tr>
       `;
     }
 
     container.innerHTML = `
-      <div style="margin-bottom: 1rem;"><strong>Total Verified Certificates:</strong> ${data.total_certificates}</div>
+      <div style="margin-bottom: 1rem;"><strong>Total Verified Certificates:</strong> ${escapeHtml(data.total_certificates)}</div>
       <table>
         <thead>
           <tr>
@@ -429,7 +482,7 @@ async function loadStats() {
       </table>
     `;
   } catch (err) {
-    container.innerHTML = `<p style="color: var(--error);">Error loading stats: ${err.message}</p>`;
+    container.innerHTML = `<p style="color: var(--error);">Error loading stats: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -632,43 +685,10 @@ async function loadBrain() {
       badge.innerText = `${brainState.encryption.algorithm} Local Encrypted`;
     }
 
-    await persistEncryptedBrainMirror(brainState);
     renderBrainExplorer();
     renderBrainThoughts();
   } catch (err) {
     console.error('Failed to load brain', err);
-  }
-}
-
-// Local browser Web Crypto AES-GCM mirror for offline client-side encrypted storage
-async function persistEncryptedBrainMirror(state) {
-  if (!window.crypto?.subtle) return;
-  try {
-    const keyStorageKey = 'rc_typing_brain_key_v1';
-    const dataStorageKey = 'rc_typing_brain_encrypted_v1';
-    let rawKeyB64 = localStorage.getItem(keyStorageKey);
-    let cryptoKey;
-
-    if (!rawKeyB64) {
-      cryptoKey = await window.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-      const exported = await window.crypto.subtle.exportKey('raw', cryptoKey);
-      rawKeyB64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
-      localStorage.setItem(keyStorageKey, rawKeyB64);
-    } else {
-      const keyBytes = Uint8Array.from(atob(rawKeyB64), c => c.charCodeAt(0));
-      cryptoKey = await window.crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-    }
-
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const encoded = new TextEncoder().encode(JSON.stringify({ folders: state.folders, thoughts: state.thoughts }));
-    const cipherBuf = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, encoded);
-    localStorage.setItem(dataStorageKey, JSON.stringify({
-      alg: 'AES-GCM',
-      iv: btoa(String.fromCharCode(...iv)),
-      ciphertext: btoa(String.fromCharCode(...new Uint8Array(cipherBuf)))
-    }));
-  } catch (err) {
-    console.warn('Local WebCrypto mirror skipped:', err);
   }
 }
 

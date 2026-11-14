@@ -65,8 +65,9 @@ class RevocationRequest(BaseModel):
 @router.post("/issuers/challenge")
 def request_challenge(db: Session = Depends(get_registry_db)):
     """Generate a challenge for proof-of-possession during issuer registration."""
-    token = secrets.token_hex(32)
     now = datetime.datetime.now(datetime.timezone.utc)
+    db.query(RegistrationChallengeModel).filter(RegistrationChallengeModel.expires_at < now).delete()
+    token = secrets.token_hex(32)
     expires = now + datetime.timedelta(minutes=5)
     record = RegistrationChallengeModel(challenge=token, created_at=now, expires_at=expires)
     db.add(record)
@@ -107,6 +108,8 @@ def register_issuer(req: IssuerRegistrationRequest, db: Session = Depends(get_re
     key_id = calculate_key_id(pub)
     existing = db.query(IssuerModel).filter(IssuerModel.id == key_id).first()
     if existing:
+        db.delete(chal_record)
+        db.commit()
         return {"issuer_id": key_id, "status": existing.status, "trust_tier": existing.trust_tier}
 
     issuer = IssuerModel(
@@ -170,41 +173,53 @@ def publish_certificate(
     cert_id = envelope.payload.cert_id
     cert_sha256 = canonical_json_hash(envelope.model_dump())
 
-    # 4. Check idempotency: if already recorded, return existing receipt
-    existing = db.query(CertificateRecordModel).filter(CertificateRecordModel.cert_id == cert_id).first()
-    if existing:
-        proof = log_service.get_inclusion_proof(existing.leaf_index)
-        head = log_service.get_latest_tree_head(db)
-        return RegistryReceipt(
-            cert_id=cert_id,
-            cert_sha256=existing.sha256,
-            leaf_index=existing.leaf_index,
-            tree_size=log_service.tree.size,
-            inclusion_proof=proof,
-            signed_tree_head=head,
-            registered_at=existing.received_at.isoformat(),
-        )
+    try:
+        issued_at_dt = datetime.datetime.fromisoformat(envelope.payload.issued_at.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid issued_at timestamp")
 
-    # 5. Append to transparency log
-    leaf_idx, tree_size, proof, signed_head = log_service.append_certificate(
-        cert_id=cert_id,
-        envelope_dict=envelope.model_dump(),
-        db=db,
-    )
+    with log_service._lock:
+        # 4. Check idempotency: if already recorded, return existing receipt
+        existing = db.query(CertificateRecordModel).filter(CertificateRecordModel.cert_id == cert_id).first()
+        if existing:
+            proof = log_service.get_inclusion_proof(existing.leaf_index)
+            head = log_service.get_latest_tree_head(db)
+            return RegistryReceipt(
+                cert_id=cert_id,
+                cert_sha256=existing.sha256,
+                leaf_index=existing.leaf_index,
+                tree_size=log_service.tree.size,
+                inclusion_proof=proof,
+                signed_tree_head=head,
+                registered_at=existing.received_at.isoformat(),
+            )
 
-    # 6. Save certificate record
-    now = datetime.datetime.now(datetime.timezone.utc)
-    rec = CertificateRecordModel(
-        cert_id=cert_id,
-        issuer_id=x_issuer_id,
-        sha256=cert_sha256,
-        envelope=envelope.model_dump(),
-        leaf_index=leaf_idx,
-        issued_at=datetime.datetime.fromisoformat(envelope.payload.issued_at.replace("Z", "+00:00")),
-        received_at=now,
-    )
-    db.add(rec)
-    db.commit()
+        # 5. Append to transparency log and save certificate record atomically
+        prev_len = log_service.tree.size
+        now = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            leaf_idx, tree_size, proof, signed_head = log_service.append_certificate(
+                cert_id=cert_id,
+                envelope_dict=envelope.model_dump(),
+                db=db,
+                commit=False,
+            )
+
+            rec = CertificateRecordModel(
+                cert_id=cert_id,
+                issuer_id=x_issuer_id,
+                sha256=cert_sha256,
+                envelope=envelope.model_dump(),
+                leaf_index=leaf_idx,
+                issued_at=issued_at_dt,
+                received_at=now,
+            )
+            db.add(rec)
+            db.commit()
+        except Exception:
+            db.rollback()
+            del log_service.tree.leaf_hashes[prev_len:]
+            raise
 
     return RegistryReceipt(
         cert_id=cert_id,
@@ -227,13 +242,15 @@ def get_certificate_record(
     if not rec:
         raise HTTPException(status_code=404, detail="Certificate not found in registry")
 
-    proof = log_service.get_inclusion_proof(rec.leaf_index)
-    head = log_service.get_latest_tree_head(db)
+    with log_service._lock:
+        proof = log_service.get_inclusion_proof(rec.leaf_index)
+        head = log_service.get_latest_tree_head(db)
+        tree_size = log_service.tree.size
 
     return {
         "envelope": rec.envelope,
         "leaf_index": rec.leaf_index,
-        "tree_size": log_service.tree.size,
+        "tree_size": tree_size,
         "trust_tier": rec.issuer.trust_tier,
         "issuer_status": rec.issuer.status,
         "is_revoked": rec.is_revoked,
@@ -260,11 +277,18 @@ def revoke_certificate(
         raise HTTPException(status_code=403, detail="Only issuing authority can revoke this certificate")
 
     # Verify signature
-    issuer = rec.issuer
-    pub = public_key_from_b64url(issuer.public_key) if not issuer.public_key.startswith("-----BEGIN") else public_key_from_pem(issuer.public_key)
-    sig_target = f"revoke:{cert_id}:{x_timestamp}".encode("utf-8")
-    sig_bytes = b64url_decode(x_signature)
-    pub.verify(sig_bytes, sig_target)
+    try:
+        issuer = rec.issuer
+        pub = (
+            public_key_from_b64url(issuer.public_key)
+            if not issuer.public_key.startswith("-----BEGIN")
+            else public_key_from_pem(issuer.public_key)
+        )
+        sig_target = f"revoke:{cert_id}:{x_timestamp}:{req.reason}".encode("utf-8")
+        sig_bytes = b64url_decode(x_signature)
+        pub.verify(sig_bytes, sig_target)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid revocation signature")
 
     rec.is_revoked = True
     rec.revocation_reason = req.reason
@@ -312,7 +336,7 @@ def update_issuer_tier(
     x_admin_token: str = Header(..., alias="X-Admin-Token"),
     db: Session = Depends(get_registry_db),
 ):
-    if x_admin_token != registry_settings.admin_token:
+    if not secrets.compare_digest(x_admin_token, registry_settings.admin_token):
         raise HTTPException(status_code=403, detail="Invalid admin token")
     issuer = db.query(IssuerModel).filter(IssuerModel.id == issuer_id).first()
     if not issuer:

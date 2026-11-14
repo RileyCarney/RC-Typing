@@ -54,9 +54,9 @@ def compute_metrics(
     last_t = keydown_events[-1].t_ms
     client_duration = max(100, last_t - first_t)
 
-    # Clamp client duration if skew is unreasonable
+    # Clamp client duration if skew is unreasonable (never shrink below keystroke span)
     if abs(client_duration - server_duration_ms) > max_clock_skew_ms:
-        duration_ms = server_duration_ms
+        duration_ms = max(client_duration, server_duration_ms)
     else:
         duration_ms = client_duration
 
@@ -97,14 +97,14 @@ def compute_metrics(
         if delta >= 0:
             ikis.append(float(delta))
 
-    if len(ikis) >= 5:
+    if ikis:
         mean_iki = sum(ikis) / len(ikis)
         variance = sum((x - mean_iki) ** 2 for x in ikis) / len(ikis)
         stddev = math.sqrt(variance)
         cv = stddev / max(1.0, mean_iki)
         consistency = round(max(0.0, min(1.0, 1.0 - cv * 0.5)), 2)
     else:
-        consistency = 1.0
+        consistency = 0.0
 
     metrics = Metrics(
         net_wpm=net_wpm,

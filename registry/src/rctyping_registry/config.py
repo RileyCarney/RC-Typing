@@ -17,7 +17,6 @@ class RegistrySettings(BaseSettings):
     port: int = 8001
     key_passphrase: Optional[str] = None
     admin_token: str = "dev-admin-secret"
-    base_url: str = "http://localhost:8001"
 
 
 registry_settings = RegistrySettings()

@@ -9,6 +9,21 @@ from rctyping_common.certificate import verify_certificate_envelope
 from rctyping_common.models import CertificateEnvelope, KeystrokeEvent
 
 
+@pytest.fixture(autouse=True)
+def isolated_app_db(tmp_path, monkeypatch):
+    import rctyping_app.db.session as app_db_session
+    from rctyping_app.config import settings
+
+    if app_db_session._engine is not None:
+        app_db_session._engine.dispose()
+    monkeypatch.setattr(app_db_session, "_engine", None)
+    monkeypatch.setattr(app_db_session, "_SessionFactory", None)
+    monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
+    yield
+    if app_db_session._engine is not None:
+        app_db_session._engine.dispose()
+
+
 def test_keystroke_replay_and_metrics():
     target = "def hello():\n    return 42"
     # Generate realistic keystrokes matching target
@@ -145,6 +160,16 @@ def test_api_session_lifecycle_and_certificate():
             t += random.randint(50, 150)
             events.append({"t_ms": t - 20, "key": key, "type": "keyup", "is_trusted": True})
 
+        import datetime
+        from rctyping_app.db.models import SessionModel
+        from rctyping_app.db.session import get_app_session
+
+        with get_app_session() as db:
+            db_sess = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+            assert db_sess is not None
+            db_sess.started_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(milliseconds=t)
+            db.commit()
+
         # 4. Finish session
         finish_resp = client.post(
             f"/api/sessions/{session_id}/finish",
@@ -236,9 +261,9 @@ def test_favicon_served():
 def test_typing_thoughts_brain_encryption_folders_and_zip_export():
     import io
     import zipfile
+    import rctyping_app.main as app_main
     from rctyping_app.db.models import ThoughtModel
     from rctyping_app.db.session import get_app_session
-    from rctyping_app.main import app_keystore
 
     with TestClient(app) as client:
         # Verify UI serves Typing Thoughts tab
@@ -301,9 +326,8 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
             row = db.query(ThoughtModel).filter(ThoughtModel.id == t1["id"]).first()
             assert row is not None
             assert thought_text not in row.encrypted_content
-            assert thought_text not in row.encrypted_markdown
-            assert app_keystore is not None
-            assert app_keystore.decrypt_text(row.encrypted_content) == thought_text
+            assert app_main.app_keystore is not None
+            assert app_main.app_keystore.decrypt_text(row.encrypted_content) == thought_text
 
         # 4. Drag/move thought t1 into Projects/Ideas
         move_resp = client.patch(
@@ -330,7 +354,7 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
             assert f"wpm: {t1['wpm']}" in exported_md
             assert "total_time: 6.0s" in exported_md
 
-        # 6. Deleting a folder preserves thoughts by moving them up to parent
+        # 6. Deleting a folder preserves thoughts by moving them up to parent and updates markdown frontmatter
         del_sub = client.delete(f"/api/thoughts/folders/{ideas_folder['id']}")
         assert del_sub.status_code == 200
         brain_resp = client.get("/api/thoughts/brain")
@@ -338,8 +362,281 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
         brain_data = brain_resp.json()
         t1_after = next(t for t in brain_data["thoughts"] if t["id"] == t1["id"])
         assert t1_after["folder_id"] == projects_folder["id"]
+        assert 'folder: "Projects"' in t1_after["markdown"]
+
+        zip_after_resp = client.get("/api/thoughts/export-zip")
+        assert zip_after_resp.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(zip_after_resp.content), "r") as zf_after:
+            exported_after = zf_after.read(f"Projects/{t1['filename']}").decode("utf-8")
+            assert 'folder: "Projects"' in exported_after
 
         # Cleanup created test thoughts & folder
         assert client.delete(f"/api/thoughts/{t1['id']}").status_code == 200
         assert client.delete(f"/api/thoughts/{t2['id']}").status_code == 200
         assert client.delete(f"/api/thoughts/folders/{projects_folder['id']}").status_code == 200
+
+
+def test_clock_skew_cannot_shrink_duration_or_inflate_wpm():
+    target = "The quick brown fox jumps over the lazy dog."
+    events = [
+        KeystrokeEvent(t_ms=i * 120, key=ch, type="keydown", is_trusted=True)
+        for i, ch in enumerate(target)
+    ]
+    metrics, text = compute_metrics(target, events, server_duration_ms=5)
+    assert text == target
+    client_span = events[-1].t_ms - events[0].t_ms
+    assert metrics.duration_ms == client_span
+    assert metrics.net_wpm < 150.0
+
+
+def test_short_keystroke_submission_is_flagged():
+    short_fast = [
+        KeystrokeEvent(t_ms=i * 10, key=ch, type="keydown", is_trusted=True)
+        for i, ch in enumerate("hello")
+    ]
+    status, flags = evaluate_keystroke_integrity(short_fast, server_duration_ms=40)
+    assert status == "flagged"
+    assert "insufficient_events" in flags
+    assert any("inhuman_speed" in f for f in flags)
+
+    one_key = [KeystrokeEvent(t_ms=0, key="a", type="keydown", is_trusted=True)]
+    metrics, _ = compute_metrics("abc", one_key, server_duration_ms=10)
+    assert metrics.consistency == 0.0
+
+
+def test_stats_exclude_flagged_and_publish_retry_resets_backoff():
+    import datetime
+    from rctyping_app.db.models import PublishJobModel, SessionModel
+    from rctyping_app.db.session import get_app_session
+
+    with TestClient(app) as client:
+        # 1. Finish a flagged session (<10 untrusted events)
+        sess1 = client.post("/api/sessions", json={"category": "prose"}).json()
+        flagged_events = [
+            {"t_ms": i * 100, "key": ch, "type": "keydown", "is_trusted": False}
+            for i, ch in enumerate(sess1["passage"]["text"][:5])
+        ]
+        f1 = client.post(
+            f"/api/sessions/{sess1['session_id']}/finish",
+            json={"events": flagged_events, "subject_name": "Cheater"},
+        )
+        assert f1.status_code == 200
+        assert f1.json()["certificate"]["payload"]["integrity"] == "flagged"
+
+        stats_before = client.get("/api/stats").json()
+        assert stats_before["total_certificates"] == 0
+        assert stats_before["by_category"] == {}
+
+        # 2. Finish a clean session
+        sess2 = client.post("/api/sessions", json={"category": "prose"}).json()
+        clean_text = sess2["passage"]["text"]
+        clean_events = []
+        t = 0
+        for idx, ch in enumerate(clean_text):
+            key = "Enter" if ch == "\n" else ch
+            clean_events.append({"t_ms": t, "key": key, "type": "keydown", "is_trusted": True})
+            clean_events.append({"t_ms": t + 20 + (idx % 3) * 5, "key": key, "type": "keyup", "is_trusted": True})
+            t += 65 if idx % 2 == 0 else 105
+        with get_app_session() as db:
+            db_sess = db.query(SessionModel).filter(SessionModel.id == sess2["session_id"]).first()
+            assert db_sess is not None
+            db_sess.started_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(milliseconds=t)
+            db.commit()
+        f2 = client.post(
+            f"/api/sessions/{sess2['session_id']}/finish",
+            json={"events": clean_events, "subject_name": "Honest"},
+        )
+        assert f2.status_code == 200
+        cert_id = f2.json()["certificate"]["payload"]["cert_id"]
+        assert f2.json()["certificate"]["payload"]["integrity"] == "clean"
+
+        stats_after = client.get("/api/stats").json()
+        assert stats_after["total_certificates"] == 1
+        assert "best_raw_wpm" not in stats_after["by_category"]["prose"]
+
+        # 3. Publish retry: 404 on missing cert, resets backoff & status on existing cert
+        assert client.post(f"/api/certificates/{uuid.uuid4()}/publish").status_code == 404
+
+        future = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
+        with get_app_session() as db:
+            job = db.query(PublishJobModel).filter(PublishJobModel.cert_id == cert_id).first()
+            assert job is not None
+            job.state = "retrying"
+            job.attempts = 4
+            job.next_attempt_at = future
+            db.commit()
+
+        before_retry = datetime.datetime.now(datetime.timezone.utc)
+        retry_resp = client.post(f"/api/certificates/{cert_id}/publish")
+        assert retry_resp.status_code == 200
+
+        with get_app_session() as db:
+            job = db.query(PublishJobModel).filter(PublishJobModel.cert_id == cert_id).first()
+            assert job.state == "pending"
+            assert job.attempts == 0
+            next_at = job.next_attempt_at.replace(tzinfo=datetime.timezone.utc)
+            assert next_at <= datetime.datetime.now(datetime.timezone.utc)
+            assert next_at >= before_retry - datetime.timedelta(seconds=2)
+
+
+def test_certificate_service_uses_configured_anticheat_settings(monkeypatch):
+    from rctyping_app.config import settings
+
+    with TestClient(app) as client:
+        monkeypatch.setattr(settings, "min_human_iki_ms", 200.0)
+        sess = client.post("/api/sessions", json={"category": "prose"}).json()
+        sample = sess["passage"]["text"][:20]
+        events = []
+        t = 0
+        for idx, ch in enumerate(sample):
+            events.append({"t_ms": t, "key": ch, "type": "keydown", "is_trusted": True})
+            events.append({"t_ms": t + 15 + (idx % 3) * 5, "key": ch, "type": "keyup", "is_trusted": True})
+            t += 90 if idx % 2 == 0 else 120
+        res = client.post(
+            f"/api/sessions/{sess['session_id']}/finish",
+            json={"events": events, "subject_name": "Settings Check"},
+        )
+        assert res.status_code == 200
+        # Mean IKI ~105ms is below overridden min_human_iki_ms=200.0 -> flagged
+        assert res.json()["certificate"]["payload"]["integrity"] == "flagged"
+
+
+@pytest.mark.asyncio
+async def test_publish_worker_caches_registration_and_releases_db(tmp_path):
+    import json
+    import httpx
+    from rctyping_app.core.keystore import KeyStore
+    from rctyping_app.db.models import CertificateModel, PublishJobModel, SessionModel
+    from rctyping_app.db.session import DEFAULT_USER_ID, get_app_session, init_db
+    from rctyping_app.services.publish_worker import PublishWorker
+
+    init_db()
+    ks = KeyStore(keys_dir=tmp_path / "data" / "keys")
+
+    with get_app_session() as db:
+        for i in range(2):
+            sid = str(uuid.uuid4())
+            cid = str(uuid.uuid4())
+            db.add(
+                SessionModel(
+                    id=sid,
+                    user_id=DEFAULT_USER_ID,
+                    category="prose",
+                    passage_id="prose-001",
+                    nonce="a" * 32,
+                    status="completed",
+                )
+            )
+            db.add(
+                CertificateModel(
+                    id=cid,
+                    user_id=DEFAULT_USER_ID,
+                    session_id=sid,
+                    envelope={"payload": {"cert_id": cid}, "signature": "sig", "issuer_public_key": "pub"},
+                    sha256="0" * 64,
+                    category="prose",
+                    net_wpm=80.0,
+                    accuracy=1.0,
+                )
+            )
+            db.add(PublishJobModel(cert_id=cid, state="pending"))
+        db.commit()
+
+    seen_requests: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append((request.method, request.url.path))
+        if request.method == "GET" and request.url.path.startswith("/v1/issuers/"):
+            return httpx.Response(200, json={"issuer_id": ks.key_id})
+        if request.method == "POST" and request.url.path == "/v1/certificates":
+            body = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(200, json={"cert_id": body["payload"]["cert_id"]})
+        return httpx.Response(404)
+
+    worker = PublishWorker(keystore=ks)
+    worker._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        await worker.process_pending_jobs()
+    finally:
+        await worker._close_client()
+
+    # Registration lookup ran only once for both pending certificates
+    get_issuer_calls = [r for r in seen_requests if r[0] == "GET"]
+    post_cert_calls = [r for r in seen_requests if r[0] == "POST" and r[1] == "/v1/certificates"]
+    assert len(get_issuer_calls) == 1
+    assert len(post_cert_calls) == 2
+
+    with get_app_session() as db:
+        assert db.query(PublishJobModel).filter(PublishJobModel.state == "completed").count() == 2
+
+
+def test_cli_verify_rejects_revoked_registry_certificate(tmp_path, monkeypatch):
+    import argparse
+    import datetime
+    import json
+    import httpx
+    from rctyping_app.cli import cmd_verify
+    from rctyping_common.canonical import canonical_json_dumps
+    from rctyping_common.certificate import calculate_key_id, generate_keypair, sign_certificate
+    from rctyping_common.merkle import MerkleTree
+    from rctyping_common.models import CertificatePayload, Metrics
+
+    priv, pub = generate_keypair()
+    key_id = calculate_key_id(pub)
+    payload = CertificatePayload(
+        version=1,
+        cert_id=str(uuid.uuid4()),
+        issued_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        subject="CLI Tester",
+        category="prose",
+        language=None,
+        passage_id="prose-001",
+        passage_sha256="00" * 32,
+        metrics=Metrics(
+            net_wpm=80.0,
+            raw_wpm=82.0,
+            accuracy=0.98,
+            consistency=0.95,
+            duration_ms=20000,
+            chars_total=150,
+            chars_correct=147,
+            chars_incorrect=3,
+        ),
+        keystroke_log_sha256="aa" * 32,
+        integrity="clean",
+        assurance="heuristic-checked",
+        nonce="bb" * 16,
+        issuer_id=key_id,
+        alg="Ed25519",
+    )
+    envelope = sign_certificate(payload, priv)
+    cert_path = tmp_path / "cert.json"
+    cert_path.write_text(json.dumps(envelope.model_dump()), encoding="utf-8")
+
+    tree = MerkleTree([canonical_json_dumps(envelope.model_dump())])
+
+    class _MockResp:
+        status_code = 200
+
+        def json(self):
+            return {
+                "envelope": envelope.model_dump(),
+                "leaf_index": 0,
+                "tree_size": 1,
+                "trust_tier": "unverified",
+                "is_revoked": True,
+                "revocation_reason": "revoked in test",
+                "inclusion_proof": {"leaf_index": 0, "tree_size": 1, "audit_path": tree.get_inclusion_proof(0)},
+                "signed_tree_head": {
+                    "tree_size": 1,
+                    "root_hash": tree.root_hex(),
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "signature": "sig",
+                },
+            }
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: _MockResp())
+    args = argparse.Namespace(certificate_file=str(cert_path), pubkey=None, registry="http://registry.local")
+    with pytest.raises(SystemExit) as exc:
+        cmd_verify(args)
+    assert exc.value.code == 2

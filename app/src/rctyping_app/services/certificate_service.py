@@ -9,6 +9,7 @@ import uuid
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
+from rctyping_app.config import settings
 from rctyping_app.core.anticheat import evaluate_keystroke_integrity
 from rctyping_app.core.keystore import KeyStore
 from rctyping_app.core.scoring import compute_metrics
@@ -19,7 +20,7 @@ from rctyping_app.db.models import (
     UserSettingsModel,
 )
 from rctyping_common.canonical import canonical_json_hash
-from rctyping_common.certificate import sign_certificate, verify_certificate_envelope
+from rctyping_common.certificate import sign_certificate
 from rctyping_common.corpus import CorpusRepository
 from rctyping_common.models import (
     CertificateEnvelope,
@@ -67,10 +68,21 @@ class CertificateService:
             raise ValueError(f"Passage '{session.passage_id}' missing from corpus")
 
         # 1. Compute metrics and replay
-        metrics, reconstructed_text = compute_metrics(passage.text, events, server_duration_ms)
+        metrics, reconstructed_text = compute_metrics(
+            passage.text,
+            events,
+            server_duration_ms,
+            max_clock_skew_ms=settings.max_clock_skew_ms,
+        )
 
         # 2. Evaluate anti-cheat heuristics
-        integrity, flags = evaluate_keystroke_integrity(events, server_duration_ms)
+        integrity, flags = evaluate_keystroke_integrity(
+            events,
+            server_duration_ms,
+            min_human_iki_ms=settings.min_human_iki_ms,
+            min_iki_stddev_ms=settings.min_iki_stddev_ms,
+            max_clock_skew_ms=settings.max_clock_skew_ms,
+        )
 
         # 3. Serialized events hash
         raw_events_dict = [e.model_dump() for e in events]
@@ -146,9 +158,3 @@ class CertificateService:
 
         self.db.commit()
         return envelope, metrics, registry_status
-
-    def get_certificate_envelope(self, cert_id: str) -> Optional[CertificateEnvelope]:
-        cert = self.db.query(CertificateModel).filter(CertificateModel.id == cert_id).first()
-        if not cert:
-            return None
-        return CertificateEnvelope(**cert.envelope)

@@ -71,7 +71,6 @@ class ThoughtModel(Base):
     duration_ms = Column(Integer, nullable=False)
     chars_typed = Column(Integer, nullable=False)
     encrypted_content = Column(Text, nullable=False)
-    encrypted_markdown = Column(Text, nullable=False)
     encryption_alg = Column(String(32), default="AES-256-GCM", nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
 

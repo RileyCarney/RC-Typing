@@ -121,7 +121,7 @@ Interactive OpenAPI docs are served at `/docs` on both services (`http://localho
 - `GET /api/certificates/{cert_id}`, `GET /api/certificates/{cert_id}/download`, `POST /api/certificates/{cert_id}/publish` — Fetch, download JSON, or re-queue registry publication
 - `POST /api/verify` — Verify an uploaded/pasted `CertificateEnvelope`
 - `GET /api/stats`, `GET /api/settings`, `PUT /api/settings` — Category stats and user settings
-- `GET /api/thoughts/brain`, `POST /api/thoughts`, `PATCH /api/thoughts/{thought_id}`, `PUT /api/thoughts/{thought_id}/move`, `DELETE /api/thoughts/{thought_id}`, `POST /api/thoughts/folders`, `DELETE /api/thoughts/folders/{folder_id}`, `GET /api/thoughts/export-zip` — Local encrypted Brain CRUD and `.zip` markdown export
+- `GET /api/thoughts/brain`, `POST /api/thoughts`, `PATCH /api/thoughts/{thought_id}`, `DELETE /api/thoughts/{thought_id}`, `POST /api/thoughts/folders`, `DELETE /api/thoughts/folders/{folder_id}`, `GET /api/thoughts/export-zip` — Local encrypted Brain CRUD and `.zip` markdown export
 
 ### Public Registry (`:8001`)
 
@@ -178,7 +178,6 @@ Both services read environment variables or a `.env` file via `pydantic-settings
 | `RCTYPING_REGISTRY_PORT` | `8001` | Registry listen port |
 | `RCTYPING_REGISTRY_KEY_PASSPHRASE` | `None` | Optional passphrase for `registry.key` |
 | `RCTYPING_REGISTRY_ADMIN_TOKEN` | `dev-admin-secret` | `X-Admin-Token` secret for trust-tier updates (`secret-admin-token` in Docker Compose) |
-| `RCTYPING_REGISTRY_BASE_URL` | `http://localhost:8001` | Public base URL of the registry |
 
 ---
 

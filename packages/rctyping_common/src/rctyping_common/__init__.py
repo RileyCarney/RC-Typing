@@ -2,6 +2,7 @@
 
 from rctyping_common.canonical import canonical_json_dumps, canonical_json_hash
 from rctyping_common.certificate import (
+    Ed25519KeyStore,
     b64url_decode,
     b64url_encode,
     calculate_key_id,
@@ -39,6 +40,7 @@ from rctyping_common.models import (
 __all__ = [
     "canonical_json_dumps",
     "canonical_json_hash",
+    "Ed25519KeyStore",
     "generate_keypair",
     "calculate_key_id",
     "sign_certificate",

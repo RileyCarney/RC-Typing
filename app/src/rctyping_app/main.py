@@ -35,11 +35,7 @@ async def lifespan(app: FastAPI):
         corpus_path = Path(__file__).resolve().parent.parent.parent.parent / "corpus" / "data"
     app_corpus = CorpusRepository.load_from_dir(corpus_path)
 
-    # 4. Dependency overrides
-    app.dependency_overrides[KeyStore] = lambda: app_keystore
-    app.dependency_overrides[CorpusRepository] = lambda: app_corpus
-
-    # 5. Start background publish worker
+    # 4. Start background publish worker
     app_worker = PublishWorker(keystore=app_keystore)
     app_worker.start()
 

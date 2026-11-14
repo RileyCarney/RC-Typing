@@ -199,6 +199,12 @@ def test_merkle_tree_and_proofs():
         consistency_path=consistency_proof,
     ) is True
 
+    # Negative size and malformed hex must return False without hanging or crashing
+    assert verify_consistency_proof(-1, 10, small_root, root_hex, consistency_proof) is False
+    assert verify_consistency_proof(4, -1, small_root, root_hex, consistency_proof) is False
+    assert verify_consistency_proof(4, 10, "zz", root_hex, ["not-hex"]) is False
+    assert verify_inclusion_proof(leaves[0], 0, 10, ["not-hex"], root_hex) is False
+
 
 def test_corpus_repository(tmp_path):
     passages = [
