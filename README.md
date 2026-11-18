@@ -76,7 +76,7 @@ rc-typing/
 
 ## Web UI Workflow
 
-- **Typing Test**: Choose a category (and language for `code`), click inside the passage viewport or start typing to begin, and press `Tab + Enter` (or click **New Passage**) to load a new passage. Completing a passage opens the certificate modal to download the `.json` certificate or send it to the verifier.
+- **Typing Test**: Choose a category (and language for `code`), click inside the passage viewport or start typing to begin, and press `Ctrl + Enter` (or click **New Passage**) to load a new passage. Completing a passage opens the certificate modal to download the `.json` certificate or send it to the verifier.
 - **Typing Thoughts**: Type markdown thoughts with live WPM, duration, and character count. Press `Enter` to push to the active folder (`Shift+Enter` inserts a newline), drag cards or tree items across folders in the Brain Explorer, download single `.md` notes, or click **Export Brain (.zip)**.
 - **Verify Certificate**: Paste JSON or upload a `.json` certificate file to verify its Ed25519 signature over canonical JSON.
 - **Stats & History**: View personal bests, test counts, average Net WPM, and average accuracy grouped by category and language.

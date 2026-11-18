@@ -9,7 +9,6 @@ let startTime = null;
 let sessionStartPromise = null;
 let liveInterval = null;
 let latestCertificate = null;
-let lastKeyWasTab = false;
 
 function escapeHtml(val) {
   return String(val ?? '')
@@ -67,21 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const testTabActive = document.getElementById('tab-test')?.classList.contains('active');
     if (!testTabActive) return;
     if (typingViewport.contains(e.target)) return;
-    if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target?.tagName)) {
-      lastKeyWasTab = false;
-      return;
-    }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      lastKeyWasTab = true;
-    } else if (e.key === 'Enter' && lastKeyWasTab) {
-      e.preventDefault();
-      lastKeyWasTab = false;
-      certModal.classList.remove('open');
-      loadNewPassage();
-    } else if (!['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) {
-      lastKeyWasTab = false;
-    }
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target?.tagName)) return;
+    handleNewPassageShortcut(e);
   });
 
   setupVerifierTab();
@@ -143,11 +129,20 @@ async function loadNewPassage() {
   }
 }
 
+function handleNewPassageShortcut(e) {
+  if (e.ctrlKey && !e.altKey && !e.metaKey && e.key === 'Enter') {
+    e.preventDefault();
+    certModal.classList.remove('open');
+    loadNewPassage();
+    return true;
+  }
+  return false;
+}
+
 function resetTestState() {
   isTestActive = false;
   startTime = null;
   sessionStartPromise = null;
-  lastKeyWasTab = false;
   keyEvents = [];
   typedChars = [];
   if (liveInterval) clearInterval(liveInterval);
@@ -171,27 +166,14 @@ function renderPassageText(text) {
 function handleKeyDown(e) {
   if (!currentPassage) return;
 
-  // Shortcut Tab + Enter for restart
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    lastKeyWasTab = true;
-    if (!isTestActive && !currentPassage.text.startsWith('    ')) {
-      return;
-    }
-  } else if (e.key === 'Enter' && lastKeyWasTab) {
-    e.preventDefault();
-    lastKeyWasTab = false;
-    loadNewPassage();
+  // Shortcut Ctrl + Enter for new passage
+  if (handleNewPassageShortcut(e)) {
     return;
   }
 
   // Ignore navigation or modifier-only keys
   if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) {
     return;
-  }
-
-  if (e.key !== 'Tab') {
-    lastKeyWasTab = false;
   }
 
   const now = performance.now();
