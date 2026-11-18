@@ -91,10 +91,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupTabs() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.remove('active');
+        b.removeAttribute('aria-current');
+      });
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
       btn.classList.add('active');
+      btn.setAttribute('aria-current', 'page');
       const tabId = `tab-${btn.dataset.tab}`;
       document.getElementById(tabId).classList.add('active');
 
@@ -102,8 +106,10 @@ function setupTabs() {
         loadBrain();
         document.getElementById('thought-input')?.focus();
       }
-      if (btn.dataset.tab === 'stats') loadStats();
-      if (btn.dataset.tab === 'settings') loadSettings();
+      if (btn.dataset.tab === 'settings') {
+        loadSettings();
+        loadStats();
+      }
     });
   });
 }

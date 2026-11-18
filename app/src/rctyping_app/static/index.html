@@ -3,240 +3,309 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>rc-typing | Verifiable Speed Across Thought</title>
+  <title>rc-typing</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&family=Patrick+Hand&display=swap">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 
-  <header>
-    <div class="brand">
-      <h1>rc-typing</h1>
-      <span class="badge-tag">Ed25519 Verified</span>
-    </div>
-    <nav>
-      <button class="nav-btn active" data-tab="test">Typing Test</button>
-      <button class="nav-btn" data-tab="thoughts">Typing Thoughts</button>
-      <button class="nav-btn" data-tab="verify">Verify Certificate</button>
-      <button class="nav-btn" data-tab="stats">Stats & History</button>
-      <button class="nav-btn" data-tab="settings">Settings</button>
-    </nav>
-  </header>
+  <!-- Shared SVG filter for graphite pencil stroke texture -->
+  <svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="pencil-stroke" x="-12%" y="-12%" width="124%" height="124%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="7" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
 
-  <main>
-    <!-- TAB 1: TYPING TEST -->
-    <section id="tab-test" class="tab-content active">
-      <div class="controls-bar">
-        <div class="category-group">
-          <label for="category-select">Category of Thought:</label>
-          <select id="category-select">
-            <option value="code">Programming Code</option>
-            <option value="prose">Prose & Literature</option>
-            <option value="reading">Reading & Encyclopedic</option>
-            <option value="technical">Technical & Scientific</option>
-            <option value="formal">Formal & Legal</option>
-            <option value="conversational">Conversational Dialogue</option>
-          </select>
+  <div class="notebook-desk">
+    <div class="notebook-sheet">
+      <div class="notebook-holes" aria-hidden="true"></div>
+      <div class="notebook-margin-line" aria-hidden="true"></div>
 
-          <div id="language-group">
-            <label for="language-select">Language:</label>
-            <select id="language-select">
-              <option value="python">Python</option>
-              <option value="powershell">PowerShell</option>
-              <option value="cpp">C++</option>
-              <option value="csharp">C#</option>
-              <option value="javascript">JavaScript</option>
-              <option value="typescript">TypeScript</option>
-              <option value="sql">SQL</option>
-            </select>
-          </div>
-        </div>
+      <header class="notebook-header">
+        <nav class="pencil-nav" aria-label="Main Menu">
+          <button type="button" class="nav-btn active" data-tab="test" aria-current="page">
+            <span class="nav-label">Typing Test</span>
+            <svg class="pencil-circle" viewBox="0 0 220 76" preserveAspectRatio="none" aria-hidden="true">
+              <path class="pencil-circle-path" pathLength="1" vector-effect="non-scaling-stroke"
+                    d="M 186 22 C 152 7, 46 8, 19 27 C 4 38, 13 62, 64 67 C 122 72, 194 63, 208 42 C 216 28, 194 15, 150 16" />
+            </svg>
+          </button>
 
-        <button id="new-passage-btn" class="btn">New Passage (Tab + Enter)</button>
-      </div>
+          <button type="button" class="nav-btn" data-tab="thoughts">
+            <span class="nav-label">Typing Thoughts</span>
+            <svg class="pencil-circle" viewBox="0 0 220 76" preserveAspectRatio="none" aria-hidden="true">
+              <path class="pencil-circle-path" pathLength="1" vector-effect="non-scaling-stroke"
+                    d="M 34 20 C 78 6, 178 9, 203 28 C 217 40, 202 63, 148 68 C 90 73, 20 62, 11 41 C 5 26, 28 15, 76 15" />
+            </svg>
+          </button>
 
-      <!-- Live Stats -->
-      <div class="live-stats">
-        <div class="stat-card">
-          <div class="stat-value" id="live-wpm">0</div>
-          <div class="stat-label">Net WPM</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="live-accuracy">100%</div>
-          <div class="stat-label">Accuracy</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="live-time">0.0s</div>
-          <div class="stat-label">Time</div>
-        </div>
-      </div>
+          <button type="button" class="nav-btn" data-tab="verify">
+            <span class="nav-label">Verify Certificate</span>
+            <svg class="pencil-circle" viewBox="0 0 220 76" preserveAspectRatio="none" aria-hidden="true">
+              <path class="pencil-circle-path" pathLength="1" vector-effect="non-scaling-stroke"
+                    d="M 192 24 C 158 8, 54 6, 22 25 C 5 35, 10 61, 58 67 C 118 74, 196 65, 210 43 C 218 30, 192 16, 144 17" />
+            </svg>
+          </button>
 
-      <!-- Passage Viewport -->
-      <div class="passage-card" id="passage-container">
-        <div class="passage-meta">
-          <span id="passage-title">Loading passage...</span>
-          <span id="passage-license">License: MIT</span>
-        </div>
+          <button type="button" class="nav-btn" data-tab="settings">
+            <span class="nav-label">Settings</span>
+            <svg class="pencil-circle" viewBox="0 0 220 76" preserveAspectRatio="none" aria-hidden="true">
+              <path class="pencil-circle-path" pathLength="1" vector-effect="non-scaling-stroke"
+                    d="M 38 19 C 88 6, 182 10, 205 29 C 218 41, 198 64, 144 68 C 84 72, 18 60, 12 39 C 8 24, 34 14, 84 14" />
+            </svg>
+          </button>
+        </nav>
+      </header>
 
-        <div id="typing-viewport" class="typing-viewport" tabindex="0"></div>
+      <main>
+        <!-- TAB 1: TYPING TEST -->
+        <section id="tab-test" class="tab-content active">
+          <div class="controls-bar">
+            <div class="category-group">
+              <label for="category-select">Category of Thought:</label>
+              <select id="category-select">
+                <option value="code">Programming Code</option>
+                <option value="prose">Prose &amp; Literature</option>
+                <option value="reading">Reading &amp; Encyclopedic</option>
+                <option value="technical">Technical &amp; Scientific</option>
+                <option value="formal">Formal &amp; Legal</option>
+                <option value="conversational">Conversational Dialogue</option>
+              </select>
 
-        <div class="focus-notice" id="focus-hint">Click inside or start typing to begin test</div>
-      </div>
-    </section>
-
-    <!-- TAB 1B: TYPING THOUGHTS -->
-    <section id="tab-thoughts" class="tab-content">
-      <div class="live-stats">
-        <div class="stat-card">
-          <div class="stat-value" id="thought-live-wpm">0</div>
-          <div class="stat-label">Speed (WPM)</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="thought-live-time">0.0s</div>
-          <div class="stat-label">Total Time</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="thought-live-chars">0</div>
-          <div class="stat-label">Characters</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value thought-folder-stat" id="thought-active-folder-label">Brain /</div>
-          <div class="stat-label">Target Folder</div>
-        </div>
-      </div>
-
-      <div class="passage-card" style="margin-bottom: 1.5rem;">
-        <div class="passage-meta">
-          <span><strong>Typing Thoughts</strong> &mdash; Type a thought and press <code>Enter</code> to push as <code>.md</code> (<code>Shift+Enter</code> for newline)</span>
-          <span class="badge-tag" id="brain-encryption-badge">AES-256-GCM Local Encrypted</span>
-        </div>
-
-        <div class="thought-composer-header">
-          <input type="text" id="thought-filename-input" placeholder="Optional filename (auto-named .md if blank)" aria-label="Optional markdown filename">
-          <button id="push-thought-btn" class="btn">Push Thought (Enter)</button>
-        </div>
-
-        <textarea id="thought-input" class="thought-textarea" placeholder="Start typing your thought... Timer starts on first keystroke. Press Enter to push to your Brain."></textarea>
-        <div class="focus-notice" id="thought-status-hint">Ready &mdash; start typing to measure WPM and time</div>
-      </div>
-
-      <!-- BRAIN SECTION -->
-      <div class="passage-card" id="brain-section">
-        <div class="brain-toolbar">
-          <div>
-            <h2>Brain Explorer</h2>
-            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 0.2rem;">
-              Locally encrypted <code>.md</code> thoughts. Drag thoughts onto any folder in the tree to organize.
-            </p>
-          </div>
-          <div class="brain-actions">
-            <input type="text" id="new-folder-input" placeholder="New folder name..." aria-label="New folder name">
-            <button id="create-folder-btn" class="btn btn-secondary">+ Add Folder</button>
-            <button id="export-brain-zip-btn" class="btn">Export Brain (.zip)</button>
-          </div>
-        </div>
-
-        <div class="brain-layout">
-          <aside class="brain-sidebar" aria-label="Brain folder structure explorer">
-            <div class="brain-sidebar-title">Folders &amp; Files</div>
-            <div id="brain-explorer-tree" class="folder-tree"></div>
-          </aside>
-
-          <div class="brain-main">
-            <div class="brain-main-header">
-              <span id="brain-current-path-heading">Brain / (All Thoughts)</span>
-              <span id="brain-thought-count" style="color: var(--text-muted); font-size: 0.8rem;">0 thoughts</span>
+              <div id="language-group">
+                <label for="language-select">Language:</label>
+                <select id="language-select">
+                  <option value="python">Python</option>
+                  <option value="powershell">PowerShell</option>
+                  <option value="cpp">C++</option>
+                  <option value="csharp">C#</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="sql">SQL</option>
+                </select>
+              </div>
             </div>
-            <div id="brain-thoughts-list" class="thoughts-list"></div>
+
+            <button type="button" id="new-passage-btn" class="btn">New Passage (Tab + Enter)</button>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- TAB 2: VERIFY CERTIFICATE -->
-    <section id="tab-verify" class="tab-content">
-      <div class="passage-card">
-        <h2>Cryptographic Certificate Verifier</h2>
-        <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem 0; font-size: 0.9rem;">
-          Mathematically verify Ed25519 digital signatures on rc-typing certificate JSON files and check Merkle transparency log inclusion proofs against the shared public registry.
-        </p>
+          <!-- Live Stats -->
+          <div class="live-stats">
+            <div class="stat-card">
+              <div class="stat-value" id="live-wpm">0</div>
+              <div class="stat-label">Net WPM</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="live-accuracy">100%</div>
+              <div class="stat-label">Accuracy</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="live-time">0.0s</div>
+              <div class="stat-label">Time</div>
+            </div>
+          </div>
 
-        <label for="cert-json-input" style="display:block; margin-bottom:0.5rem;">Paste Certificate JSON or drop file:</label>
-        <textarea id="cert-json-input" placeholder='{"payload": {...}, "signature": "...", "issuer_public_key": "..."}'></textarea>
+          <!-- Passage Viewport -->
+          <div class="passage-card" id="passage-container">
+            <div class="passage-meta">
+              <span id="passage-title">Loading passage...</span>
+              <span id="passage-license">License: MIT</span>
+            </div>
 
-        <div style="display: flex; gap: 1rem; margin-top: 1rem; align-items: center;">
-          <input type="file" id="cert-file-input" accept=".json" style="display: none;">
-          <button id="upload-cert-btn" class="btn btn-secondary">Upload .json</button>
-          <button id="run-verify-btn" class="btn">Verify Mathematical Signature</button>
-        </div>
+            <div id="typing-viewport" class="typing-viewport" tabindex="0"></div>
 
-        <div id="verify-results" style="display: none; margin-top: 2rem;">
-          <hr style="border: 0; border-top: 1px solid var(--border); margin-bottom: 1.5rem;">
-          <h3>Verification Report</h3>
-          <div id="verify-badge-container" style="margin: 0.75rem 0;"></div>
-          <table id="verify-details-table">
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+            <div class="focus-notice" id="focus-hint">Click inside or start typing to begin test</div>
+          </div>
+        </section>
 
-    <!-- TAB 3: STATS & HISTORY -->
-    <section id="tab-stats" class="tab-content">
-      <div class="passage-card">
-        <h2>Performance Across Categories of Thought</h2>
-        <p style="color: var(--text-muted); margin: 0.5rem 0 1.5rem 0; font-size: 0.9rem;">
-          Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
-        </p>
-        <div id="stats-container">
-          <p style="color: var(--text-muted);">Loading stats...</p>
-        </div>
-      </div>
-    </section>
+        <!-- TAB 2: TYPING THOUGHTS -->
+        <section id="tab-thoughts" class="tab-content">
+          <div class="live-stats">
+            <div class="stat-card">
+              <div class="stat-value" id="thought-live-wpm">0</div>
+              <div class="stat-label">Speed (WPM)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="thought-live-time">0.0s</div>
+              <div class="stat-label">Total Time</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="thought-live-chars">0</div>
+              <div class="stat-label">Characters</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value thought-folder-stat" id="thought-active-folder-label">Brain /</div>
+              <div class="stat-label">Target Folder</div>
+            </div>
+          </div>
 
-    <!-- TAB 4: SETTINGS -->
-    <section id="tab-settings" class="tab-content">
-      <div class="passage-card">
-        <h2>Application & Registry Settings</h2>
-        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 600px;">
-          <div>
-            <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: var(--text-main); font-size: 1rem;">
-              <input type="checkbox" id="setting-auto-publish" style="width: 1.2rem; height: 1.2rem;">
-              <strong>Auto-publish certificates to Public Registry (Default: Enabled)</strong>
-            </label>
-            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.4rem 0 0 2rem;">
-              When enabled, signed certificate envelopes are submitted to the transparency log. Your keystrokes remain private on your machine; only their cryptographic SHA-256 hash and metrics are published.
+          <div class="passage-card" style="margin-bottom: 1.5rem;">
+            <div class="passage-meta">
+              <span><strong>Typing Thoughts</strong> &mdash; Type a thought and press <code>Enter</code> to push as <code>.md</code> (<code>Shift+Enter</code> for newline)</span>
+              <span class="badge-tag" id="brain-encryption-badge">AES-256-GCM Local Encrypted</span>
+            </div>
+
+            <div class="thought-composer-header">
+              <input type="text" id="thought-filename-input" placeholder="Optional filename (auto-named .md if blank)" aria-label="Optional markdown filename">
+              <button type="button" id="push-thought-btn" class="btn">Push Thought (Enter)</button>
+            </div>
+
+            <textarea id="thought-input" class="thought-textarea" placeholder="Start typing your thought... Timer starts on first keystroke. Press Enter to push to your Brain."></textarea>
+            <div class="focus-notice" id="thought-status-hint">Ready &mdash; start typing to measure WPM and time</div>
+          </div>
+
+          <!-- BRAIN SECTION -->
+          <div class="passage-card" id="brain-section">
+            <div class="brain-toolbar">
+              <div>
+                <h2>Brain Explorer</h2>
+                <p class="muted-note" style="margin-top: 0.2rem;">
+                  Locally encrypted <code>.md</code> thoughts. Drag thoughts onto any folder in the tree to organize.
+                </p>
+              </div>
+              <div class="brain-actions">
+                <input type="text" id="new-folder-input" placeholder="New folder name..." aria-label="New folder name">
+                <button type="button" id="create-folder-btn" class="btn btn-secondary">+ Add Folder</button>
+                <button type="button" id="export-brain-zip-btn" class="btn">Export Brain (.zip)</button>
+              </div>
+            </div>
+
+            <div class="brain-layout">
+              <aside class="brain-sidebar" aria-label="Brain folder structure explorer">
+                <div class="brain-sidebar-title">Folders &amp; Files</div>
+                <div id="brain-explorer-tree" class="folder-tree"></div>
+              </aside>
+
+              <div class="brain-main">
+                <div class="brain-main-header">
+                  <span id="brain-current-path-heading">Brain / (All Thoughts)</span>
+                  <span id="brain-thought-count" class="muted-note">0 thoughts</span>
+                </div>
+                <div id="brain-thoughts-list" class="thoughts-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: VERIFY CERTIFICATE -->
+        <section id="tab-verify" class="tab-content">
+          <div class="passage-card">
+            <h2>Cryptographic Certificate Verifier</h2>
+            <p class="muted-note" style="margin: 0.5rem 0 1.5rem 0; font-size: 0.95rem;">
+              Mathematically verify Ed25519 digital signatures on rc-typing certificate JSON files and check Merkle transparency log inclusion proofs against the shared public registry.
             </p>
+
+            <label for="cert-json-input" style="display:block; margin-bottom:0.5rem;">Paste Certificate JSON or drop file:</label>
+            <textarea id="cert-json-input" placeholder='{"payload": {...}, "signature": "...", "issuer_public_key": "..."}'></textarea>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
+              <input type="file" id="cert-file-input" accept=".json" style="display: none;">
+              <button type="button" id="upload-cert-btn" class="btn btn-secondary">Upload .json</button>
+              <button type="button" id="run-verify-btn" class="btn">Verify Mathematical Signature</button>
+            </div>
+
+            <div id="verify-results" style="display: none; margin-top: 2rem;">
+              <hr class="pencil-divider">
+              <h3>Verification Report</h3>
+              <div id="verify-badge-container" style="margin: 0.75rem 0;"></div>
+              <table id="verify-details-table">
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: SETTINGS -->
+        <section id="tab-settings" class="tab-content">
+          <div class="passage-card" style="margin-bottom: 1.5rem;">
+            <h2>Application &amp; Registry Settings</h2>
+            <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 600px;">
+              <div>
+                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: var(--text-main); font-size: 1rem;">
+                  <input type="checkbox" id="setting-auto-publish" style="width: 1.15rem; height: 1.15rem;">
+                  <strong>Auto-publish certificates to Public Registry (Default: Enabled)</strong>
+                </label>
+                <p class="muted-note" style="font-size: 0.85rem; margin: 0.4rem 0 0 2rem;">
+                  When enabled, signed certificate envelopes are submitted to the transparency log. Your keystrokes remain private on your machine; only their cryptographic SHA-256 hash and metrics are published.
+                </p>
+              </div>
+
+              <div>
+                <label for="setting-default-name" style="display:block; margin-bottom:0.4rem;">Default Certificate Display Name:</label>
+                <input type="text" id="setting-default-name" style="width: 100%;" placeholder="e.g. Satoshi Typist">
+                <p class="muted-note" style="font-size: 0.82rem; margin-top: 0.25rem;">
+                  Free-form label included in signed certificates. Stripped of control and bidi-override characters.
+                </p>
+              </div>
+
+              <div>
+                <label for="setting-registry-url" style="display:block; margin-bottom:0.4rem;">Public Registry URL:</label>
+                <input type="text" id="setting-registry-url" style="width: 100%;" placeholder="http://localhost:8001">
+              </div>
+
+              <div>
+                <button type="button" id="save-settings-btn" class="btn">Save Settings</button>
+                <span id="settings-status" style="margin-left: 1rem; font-size: 0.9rem; color: var(--correct);"></span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label for="setting-default-name" style="display:block; margin-bottom:0.4rem;">Default Certificate Display Name:</label>
-            <input type="text" id="setting-default-name" style="width: 100%;" placeholder="e.g. Satoshi Typist">
-            <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem;">
-              Free-form label included in signed certificates. Stripped of control and bidi-override characters.
+          <section id="application-information" class="passage-card" style="margin-bottom: 1.5rem;" aria-labelledby="app-info-heading">
+            <h2 id="app-info-heading">Application Information</h2>
+            <div class="app-info-grid">
+              <div class="app-info-item">
+                <div class="app-info-label">Application</div>
+                <div class="app-info-value">rc-typing</div>
+              </div>
+              <div class="app-info-item">
+                <div class="app-info-label">Architecture</div>
+                <div class="app-info-value">Standalone Containerized Benchmark</div>
+              </div>
+              <div class="app-info-item">
+                <div class="app-info-label">Canonical Serialization</div>
+                <div class="app-info-value">RFC 8785 Canonical JSON</div>
+              </div>
+              <div class="app-info-item">
+                <div class="app-info-label">Digital Signatures</div>
+                <div class="app-info-value">Ed25519 <span class="badge-tag">Ed25519 Verified</span></div>
+              </div>
+              <div class="app-info-item">
+                <div class="app-info-label">Audit Log</div>
+                <div class="app-info-value">RFC 6962 Transparency Log</div>
+              </div>
+            </div>
+          </section>
+
+          <div class="passage-card">
+            <h2>Performance Across Categories of Thought</h2>
+            <p class="muted-note" style="margin: 0.5rem 0 1.25rem 0; font-size: 0.92rem;">
+              Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
             </p>
+            <div id="stats-container">
+              <p class="muted-note">Loading stats...</p>
+            </div>
           </div>
+        </section>
+      </main>
 
-          <div>
-            <label for="setting-registry-url" style="display:block; margin-bottom:0.4rem;">Public Registry URL:</label>
-            <input type="text" id="setting-registry-url" style="width: 100%;" placeholder="http://localhost:8001">
-          </div>
-
-          <div>
-            <button id="save-settings-btn" class="btn">Save Settings</button>
-            <span id="settings-status" style="margin-left: 1rem; font-size: 0.85rem; color: var(--correct);"></span>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
+      <footer class="footer">
+        <a href="https://carn.si" target="_blank" rel="noopener noreferrer">https://carn.si</a>
+      </footer>
+    </div>
+  </div>
 
   <!-- CERTIFICATE RESULT MODAL -->
   <div class="modal-overlay" id="cert-modal">
     <div class="modal-card">
       <div class="modal-header">
         <h2>Cryptographic Certificate Issued</h2>
-        <button id="close-modal-btn" class="btn btn-secondary" style="padding: 0.3rem 0.7rem;">&times;</button>
+        <button type="button" id="close-modal-btn" class="btn btn-secondary" style="padding: 0.3rem 0.7rem;">&times;</button>
       </div>
 
       <div id="modal-status-badge"></div>
@@ -268,21 +337,17 @@
         </div>
       </div>
 
-      <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 1rem; border-top: 1px dashed var(--border); padding-top: 0.75rem;">
         <div><strong>Certificate ID:</strong> <span id="cert-val-id" style="font-family: var(--font-mono);"></span></div>
-        <div style="margin-top: 0.25rem;"><strong>Issuer Key ID:</strong> <span id="cert-val-issuer" style="font-family: var(--font-mono); font-size: 0.75rem;"></span></div>
+        <div style="margin-top: 0.25rem;"><strong>Issuer Key ID:</strong> <span id="cert-val-issuer" style="font-family: var(--font-mono); font-size: 0.8rem;"></span></div>
       </div>
 
       <div class="modal-actions">
-        <button id="download-cert-btn" class="btn">Download Certificate (.json)</button>
-        <button id="view-in-verifier-btn" class="btn btn-secondary">Open in Verifier</button>
+        <button type="button" id="download-cert-btn" class="btn">Download Certificate (.json)</button>
+        <button type="button" id="view-in-verifier-btn" class="btn btn-secondary">Open in Verifier</button>
       </div>
     </div>
   </div>
-
-  <footer class="footer">
-    rc-typing &bull; Standalone Containerized Benchmark &bull; RFC 8785 Canonical JSON &bull; Ed25519 &bull; RFC 6962 Transparency Log
-  </footer>
 
   <script src="/static/app.js"></script>
 </body>

@@ -640,3 +640,111 @@ def test_cli_verify_rejects_revoked_registry_certificate(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as exc:
         cmd_verify(args)
     assert exc.value.code == 2
+
+
+def test_notebook_ui_menu_settings_info_and_footer():
+    import re
+    from html.parser import HTMLParser
+
+    class _UIParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_header = False
+            self.in_nav = False
+            self.in_footer = False
+            self.in_button = False
+            self.in_settings = False
+            self.settings_depth = 0
+            self.header_text_parts: list[str] = []
+            self.nav_buttons: list[str] = []
+            self.nav_button_circle_paths = 0
+            self.current_btn_parts: list[str] = []
+            self.footer_text_parts: list[str] = []
+            self.footer_links: list[str] = []
+            self.settings_text_parts: list[str] = []
+
+        def handle_starttag(self, tag, attrs):
+            attr_map = dict(attrs)
+            if tag == "header":
+                self.in_header = True
+            elif tag == "nav" and self.in_header:
+                self.in_nav = True
+            elif tag == "button" and self.in_nav:
+                self.in_button = True
+                self.current_btn_parts = []
+            elif tag == "path" and self.in_button and "pencil-circle-path" in attr_map.get("class", ""):
+                self.nav_button_circle_paths += 1
+            elif tag == "section" and attr_map.get("id") == "tab-settings":
+                self.in_settings = True
+                self.settings_depth = 1
+            elif self.in_settings and tag == "section":
+                self.settings_depth += 1
+            elif tag == "footer":
+                self.in_footer = True
+            elif tag == "a" and self.in_footer and "href" in attr_map:
+                self.footer_links.append(attr_map["href"])
+
+        def handle_endtag(self, tag):
+            if tag == "button" and self.in_button:
+                self.in_button = False
+                self.nav_buttons.append(" ".join("".join(self.current_btn_parts).split()))
+            elif tag == "nav" and self.in_nav:
+                self.in_nav = False
+            elif tag == "header" and self.in_header:
+                self.in_header = False
+            elif tag == "section" and self.in_settings:
+                self.settings_depth -= 1
+                if self.settings_depth == 0:
+                    self.in_settings = False
+            elif tag == "footer" and self.in_footer:
+                self.in_footer = False
+
+        def handle_data(self, data):
+            if self.in_header:
+                self.header_text_parts.append(data)
+            if self.in_button:
+                self.current_btn_parts.append(data)
+            if self.in_settings:
+                self.settings_text_parts.append(data)
+            if self.in_footer:
+                self.footer_text_parts.append(data)
+
+    with TestClient(app) as client:
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.text
+
+        parser = _UIParser()
+        parser.feed(html)
+
+        expected_menu = ["Typing Test", "Typing Thoughts", "Verify Certificate", "Settings"]
+        assert parser.nav_buttons == expected_menu
+        assert parser.nav_button_circle_paths == len(expected_menu)
+
+        header_text = " ".join("".join(parser.header_text_parts).split())
+        assert header_text == " ".join(expected_menu)
+        assert "Stats & History" not in html
+        assert "notebook-sheet" in html
+        assert "notebook-holes" in html
+        assert "notebook-margin-line" in html
+
+        settings_text = " ".join("".join(parser.settings_text_parts).split())
+        for info_item in [
+            "Application Information",
+            "rc-typing",
+            "Standalone Containerized Benchmark",
+            "RFC 8785 Canonical JSON",
+            "Ed25519",
+            "RFC 6962 Transparency Log",
+        ]:
+            assert info_item in settings_text
+
+        footer_text = " ".join("".join(parser.footer_text_parts).split())
+        assert footer_text == "https://carn.si"
+        assert parser.footer_links == ["https://carn.si"]
+
+        css_resp = client.get("/static/styles.css")
+        assert css_resp.status_code == 200
+        assert ".pencil-circle-path" in css_resp.text
+        assert re.search(r"\.nav-btn:hover\s+\.pencil-circle-path", css_resp.text)
+        assert "prefers-reduced-motion" in css_resp.text
