@@ -49,10 +49,10 @@ def compute_metrics(
             "",
         )
 
-    # Determine duration
+    # Determine duration (floor at 1ms only to prevent division by zero; no artificial WPM cap)
     first_t = keydown_events[0].t_ms
     last_t = keydown_events[-1].t_ms
-    client_duration = max(100, last_t - first_t)
+    client_duration = max(1, last_t - first_t)
 
     # Clamp client duration if skew is unreasonable (never shrink below keystroke span)
     if abs(client_duration - server_duration_ms) > max_clock_skew_ms:
@@ -60,7 +60,7 @@ def compute_metrics(
     else:
         duration_ms = client_duration
 
-    duration_minutes = max(0.001, duration_ms / 60000.0)
+    duration_minutes = max(1, duration_ms) / 60000.0
 
     # Replay text
     reconstructed = replay_keystrokes(keydown_events)

@@ -405,6 +405,7 @@ input[type="checkbox"] {
   color: var(--accent);
   font-family: var(--font-hand);
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .stat-value.pixel-stat-value {

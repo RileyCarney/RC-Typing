@@ -22,8 +22,8 @@ class AppSettings(BaseSettings):
 
     # Wall clock skew allowance between client finish timestamp and server finish timestamp (in ms)
     max_clock_skew_ms: int = 4000
-    # Minimum keystroke interval to detect bot pastes / turbo macros (in ms)
-    min_human_iki_ms: float = 35.0
+    # Minimum keystroke interval in ms (0.0 disables the upper WPM speed cap for limitless top WPM)
+    min_human_iki_ms: float = 0.0
     # Minimum standard deviation of keystroke intervals (in ms) to detect uniform loop bots
     min_iki_stddev_ms: float = 4.0
 

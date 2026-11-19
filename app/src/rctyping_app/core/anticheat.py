@@ -10,7 +10,7 @@ from rctyping_common.models import KeystrokeEvent
 def evaluate_keystroke_integrity(
     events: List[KeystrokeEvent],
     server_duration_ms: int,
-    min_human_iki_ms: float = 35.0,
+    min_human_iki_ms: float = 0.0,
     min_iki_stddev_ms: float = 4.0,
     max_clock_skew_ms: int = 4000,
 ) -> Tuple[str, List[str]]:
@@ -51,12 +51,15 @@ def evaluate_keystroke_integrity(
         variance = sum((x - mean_iki) ** 2 for x in ikis) / len(ikis)
         stddev_iki = math.sqrt(variance)
 
-        # Inhuman sustained speed (> 28.5 chars/sec)
-        if mean_iki < min_human_iki_ms:
+        # Optional minimum IKI speed check (disabled when min_human_iki_ms <= 0)
+        if min_human_iki_ms > 0 and mean_iki < min_human_iki_ms:
             flags.append(f"inhuman_speed_iki_{mean_iki:.1f}ms")
 
-        # Suspiciously uniform timing (macro loop without realistic human jitter)
-        if len(ikis) >= 20 and stddev_iki < min_iki_stddev_ms:
+        # Suspiciously uniform timing (macro loop without realistic human jitter).
+        # Scale threshold proportionally at very high speeds so >600 WPM / limitless typing
+        # with natural relative jitter is not falsely flagged.
+        effective_min_stddev = min(min_iki_stddev_ms, mean_iki * 0.08)
+        if len(ikis) >= 20 and effective_min_stddev > 0 and stddev_iki < effective_min_stddev:
             flags.append(f"uniform_timing_loop_stddev_{stddev_iki:.2f}ms")
 
     # 4. Key Dwell Times (keydown to keyup)
@@ -75,9 +78,9 @@ def evaluate_keystroke_integrity(
                 dwells.append(float(matching[0] - kd.t_ms))
 
     if len(dwells) >= 20:
-        # Check if all dwell times are identical (macro device with fixed duration)
+        # Check if all dwell times are identical and non-zero (macro device with fixed duration)
         unique_dwells = set(round(d, 1) for d in dwells)
-        if len(unique_dwells) == 1:
+        if len(unique_dwells) == 1 and next(iter(unique_dwells)) > 0:
             flags.append("uniform_dwell_fixed_macro")
 
     integrity = "clean" if not flags else "flagged"

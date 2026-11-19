@@ -166,7 +166,7 @@ Both services read environment variables or a `.env` file via `pydantic-settings
 | `RCTYPING_PUBLISH_DEFAULT` | `true` | Auto-publish new certificates to the registry |
 | `RCTYPING_CORPUS_DIR` | `corpus/data` | Path to generated corpus JSON files (`/app/corpus/data` in Docker) |
 | `RCTYPING_MAX_CLOCK_SKEW_MS` | `4000` | Allowed client/server finish duration skew (ms) |
-| `RCTYPING_MIN_HUMAN_IKI_MS` | `35.0` | Minimum mean inter-keystroke interval threshold (ms) |
+| `RCTYPING_MIN_HUMAN_IKI_MS` | `0.0` | Minimum mean inter-keystroke interval threshold (ms); `0.0` disables the upper WPM cap |
 | `RCTYPING_MIN_IKI_STDDEV_MS` | `4.0` | Minimum IKI standard deviation threshold for >=20 intervals (ms) |
 
 #### Registry Settings (`RCTYPING_REGISTRY_*`)

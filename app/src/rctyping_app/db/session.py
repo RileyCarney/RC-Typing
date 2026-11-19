@@ -1,7 +1,8 @@
 """Database session and initialization."""
 
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from rctyping_app.config import settings
@@ -31,9 +32,20 @@ def get_app_session() -> Session:
     return _SessionFactory()
 
 
+def _migrate_schema(eng: Engine) -> None:
+    """Apply lightweight, idempotent schema migrations for existing SQLite databases."""
+    inspector = inspect(eng)
+    if inspector.has_table("thoughts"):
+        thought_columns = {col["name"] for col in inspector.get_columns("thoughts")}
+        if "encrypted_markdown" in thought_columns:
+            with eng.begin() as conn:
+                conn.execute(text("ALTER TABLE thoughts DROP COLUMN encrypted_markdown"))
+
+
 def init_db(db_path: Path | None = None):
     eng = get_engine(db_path)
     Base.metadata.create_all(bind=eng)
+    _migrate_schema(eng)
 
     # Seed default user if not present
     with get_app_session() as db:

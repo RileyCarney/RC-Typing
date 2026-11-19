@@ -557,7 +557,7 @@ def push_thought(
     computed_wpm = (
         round(req.wpm, 1)
         if req.wpm is not None
-        else round((chars_typed / 5.0) / max(req.duration_ms / 60000.0, 0.001), 1)
+        else round((chars_typed / 5.0) / (req.duration_ms / 60000.0), 1)
     )
     filename = slugify_filename(content, req.filename)
     created_at = datetime.datetime.now(datetime.timezone.utc)

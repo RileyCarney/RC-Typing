@@ -261,7 +261,8 @@ function handleKeyUp(e) {
 
 function updateLiveStats() {
   if (!startTime || !currentPassage) return;
-  const elapsedSec = (performance.now() - startTime) / 1000;
+  const elapsedMs = performance.now() - startTime;
+  const elapsedSec = Math.max(0, elapsedMs) / 1000;
   liveTime.innerText = `${elapsedSec.toFixed(1)}s`;
 
   let correct = 0;
@@ -269,8 +270,7 @@ function updateLiveStats() {
     if (typedChars[i] === currentPassage.text[i]) correct++;
   }
 
-  const minutes = Math.max(0.001, elapsedSec / 60);
-  const wpm = Math.round((correct / 5) / minutes);
+  const wpm = elapsedMs > 0 ? Math.round((correct / 5) / (elapsedMs / 60000)) : 0;
   const accuracy = typedChars.length > 0 ? Math.round((correct / typedChars.length) * 100) : 100;
 
   liveWpm.innerText = wpm;
@@ -607,7 +607,7 @@ function updateThoughtLiveTelemetry() {
 
   const elapsedMs = Math.max(1, performance.now() - thoughtStartTime);
   const elapsedSec = elapsedMs / 1000;
-  const minutes = Math.max(0.001, elapsedSec / 60);
+  const minutes = elapsedMs / 60000;
   const wpm = Math.round((text.length / 5) / minutes);
 
   if (wpmEl) wpmEl.innerText = String(wpm);
@@ -626,8 +626,8 @@ async function pushCurrentThought() {
     return;
   }
 
-  const durationMs = thoughtStartTime ? Math.max(50, Math.round(performance.now() - thoughtStartTime)) : 500;
-  const minutes = Math.max(0.001, durationMs / 60000);
+  const durationMs = thoughtStartTime ? Math.max(1, Math.round(performance.now() - thoughtStartTime)) : 500;
+  const minutes = durationMs / 60000;
   const wpm = Math.round(((content.length / 5) / minutes) * 10) / 10;
   const customFilename = filenameInput ? filenameInput.value.trim() : '';
 

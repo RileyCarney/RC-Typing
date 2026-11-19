@@ -113,12 +113,19 @@ def test_anticheat_heuristics():
     assert status == "flagged"
     assert "untrusted_browser_event" in flags
 
-    # 2. Inhuman speed (< 35ms per keystroke)
+    # 2. High speed (>600 WPM) is clean by default (limitless top WPM),
+    #    and only flagged when min_human_iki_ms is explicitly configured > 0.
     turbo = [
-        KeystrokeEvent(t_ms=i * 10, key="x", type="keydown", is_trusted=True)
+        KeystrokeEvent(t_ms=i * 10 + (i % 3), key="x", type="keydown", is_trusted=True)
         for i in range(15)
     ]
-    status2, flags2 = evaluate_keystroke_integrity(turbo, server_duration_ms=150)
+    status_default, flags_default = evaluate_keystroke_integrity(turbo, server_duration_ms=150)
+    assert status_default == "clean"
+    assert flags_default == []
+
+    status2, flags2 = evaluate_keystroke_integrity(
+        turbo, server_duration_ms=150, min_human_iki_ms=35.0
+    )
     assert status2 == "flagged"
     assert any("inhuman_speed" in f for f in flags2)
 
@@ -397,7 +404,13 @@ def test_short_keystroke_submission_is_flagged():
     status, flags = evaluate_keystroke_integrity(short_fast, server_duration_ms=40)
     assert status == "flagged"
     assert "insufficient_events" in flags
-    assert any("inhuman_speed" in f for f in flags)
+
+    status_capped, flags_capped = evaluate_keystroke_integrity(
+        short_fast, server_duration_ms=40, min_human_iki_ms=35.0
+    )
+    assert status_capped == "flagged"
+    assert "insufficient_events" in flags_capped
+    assert any("inhuman_speed" in f for f in flags_capped)
 
     one_key = [KeystrokeEvent(t_ms=0, key="a", type="keydown", is_trusted=True)]
     metrics, _ = compute_metrics("abc", one_key, server_duration_ms=10)
@@ -824,3 +837,161 @@ def test_live_test_stat_values_use_pixel_font_exclusively():
         assert css_resp.status_code == 200
         assert "--font-pixel: 'Press Start 2P', monospace;" in css_resp.text
         assert re.search(r"\.stat-value\.pixel-stat-value\s*\{[^}]*font-family:\s*var\(--font-pixel\)", css_resp.text)
+
+
+def test_migrate_legacy_thoughts_encrypted_markdown_column():
+    import sqlite3
+    from rctyping_app.config import settings
+
+    db_path = settings.data_dir / "rctyping.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE thoughts (
+                id VARCHAR(36) NOT NULL PRIMARY KEY,
+                user_id VARCHAR(36) NOT NULL,
+                folder_id VARCHAR(36),
+                filename VARCHAR(160) NOT NULL,
+                wpm FLOAT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                chars_typed INTEGER NOT NULL,
+                encrypted_content TEXT NOT NULL,
+                encrypted_markdown TEXT NOT NULL,
+                encryption_alg VARCHAR(32) NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/thoughts",
+            json={"content": "test", "duration_ms": 472, "filename": "test.md"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["filename"] == "test.md"
+        assert data["content"] == "test"
+
+    with sqlite3.connect(db_path) as conn:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(thoughts)").fetchall()}
+        assert "encrypted_markdown" not in cols
+        assert "encrypted_content" in cols
+
+
+def test_scoring_supports_over_600_wpm_and_limitless_speed():
+    # 1. >600 WPM sustained typing (100 chars in 1500ms = 800.0 WPM)
+    target_100 = "a" * 100
+    events_800 = [
+        KeystrokeEvent(t_ms=int(i * (1500 / 99)), key="a", type="keydown", is_trusted=True)
+        for i in range(100)
+    ]
+    metrics_800, text_800 = compute_metrics(target_100, events_800, server_duration_ms=1500)
+    assert text_800 == target_100
+    assert metrics_800.duration_ms == 1500
+    assert metrics_800.net_wpm == 800.0
+    assert metrics_800.net_wpm > 600.0
+
+    # 2. Sub-100ms duration (5 chars in 50ms = 1200.0 WPM, previously capped at 600 WPM by 100ms floor)
+    target_5 = "hello"
+    events_1200 = [
+        KeystrokeEvent(t_ms=i * 12 if i < 4 else 50, key=ch, type="keydown", is_trusted=True)
+        for i, ch in enumerate(target_5)
+    ]
+    metrics_1200, _ = compute_metrics(target_5, events_1200, server_duration_ms=50)
+    assert metrics_1200.duration_ms == 50
+    assert metrics_1200.net_wpm == 1200.0
+
+    # 3. Ultra-high / limitless WPM (100 chars in 10ms = 120,000.0 WPM)
+    events_ultra = [
+        KeystrokeEvent(t_ms=(i * 10) // 99, key="a", type="keydown", is_trusted=True)
+        for i in range(100)
+    ]
+    metrics_ultra, _ = compute_metrics(target_100, events_ultra, server_duration_ms=10)
+    assert metrics_ultra.duration_ms == 10
+    assert metrics_ultra.net_wpm == 120000.0
+
+
+def test_end_to_end_over_600_wpm_and_limitless_top_wpm_stats():
+    import datetime
+    from rctyping_app.db.models import SessionModel
+    from rctyping_app.db.session import get_app_session
+
+    with TestClient(app) as client:
+        # Run 1: >600 WPM (~800+ WPM with natural jitter)
+        sess1 = client.post("/api/sessions", json={"category": "prose"}).json()
+        text1 = sess1["passage"]["text"]
+        events1 = []
+        t1 = 0
+        for idx, ch in enumerate(text1):
+            key = "Enter" if ch == "\n" else ch
+            events1.append({"t_ms": t1, "key": key, "type": "keydown", "is_trusted": True})
+            events1.append({"t_ms": t1 + 3 + (idx % 3), "key": key, "type": "keyup", "is_trusted": True})
+            t1 += 10 if idx % 2 == 0 else 18  # mean IKI ~14ms (~857 WPM)
+
+        with get_app_session() as db:
+            db_sess = db.query(SessionModel).filter(SessionModel.id == sess1["session_id"]).first()
+            assert db_sess is not None
+            db_sess.started_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(milliseconds=t1)
+            db.commit()
+
+        f1 = client.post(
+            f"/api/sessions/{sess1['session_id']}/finish",
+            json={"events": events1, "subject_name": "Speedster"},
+        )
+        assert f1.status_code == 200
+        env1 = CertificateEnvelope(**f1.json()["certificate"])
+        assert env1.payload.integrity == "clean"
+        assert env1.payload.metrics.net_wpm > 600.0
+        assert verify_certificate_envelope(env1) is True
+
+        stats1 = client.get("/api/stats").json()
+        assert stats1["total_certificates"] == 1
+        assert stats1["by_category"]["prose"]["best_net_wpm"] > 600.0
+
+        # Run 2: Limitless ultra-high WPM (~4000+ WPM with relative jitter)
+        sess2 = client.post("/api/sessions", json={"category": "prose"}).json()
+        text2 = sess2["passage"]["text"]
+        events2 = []
+        t2 = 0
+        for idx, ch in enumerate(text2):
+            key = "Enter" if ch == "\n" else ch
+            events2.append({"t_ms": t2, "key": key, "type": "keydown", "is_trusted": True})
+            events2.append({"t_ms": t2 + 1 + (idx % 2), "key": key, "type": "keyup", "is_trusted": True})
+            t2 += 2 if idx % 2 == 0 else 4  # mean IKI ~3ms (~4000 WPM)
+
+        with get_app_session() as db:
+            db_sess = db.query(SessionModel).filter(SessionModel.id == sess2["session_id"]).first()
+            assert db_sess is not None
+            db_sess.started_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(milliseconds=t2)
+            db.commit()
+
+        f2 = client.post(
+            f"/api/sessions/{sess2['session_id']}/finish",
+            json={"events": events2, "subject_name": "Limitless"},
+        )
+        assert f2.status_code == 200
+        env2 = CertificateEnvelope(**f2.json()["certificate"])
+        assert env2.payload.integrity == "clean"
+        assert env2.payload.metrics.net_wpm > 3000.0
+        assert verify_certificate_envelope(env2) is True
+
+        stats2 = client.get("/api/stats").json()
+        assert stats2["total_certificates"] == 2
+        assert stats2["by_category"]["prose"]["best_net_wpm"] == env2.payload.metrics.net_wpm
+        assert stats2["by_category"]["prose"]["best_net_wpm"] > 3000.0
+
+
+def test_typing_thoughts_uncapped_wpm():
+    with TestClient(app) as client:
+        # 50 chars in 10ms = (50 / 5) / (10 / 60000) = 60,000.0 WPM (no 0.001 min / 60ms cap)
+        resp = client.post(
+            "/api/thoughts",
+            json={"content": "a" * 50, "duration_ms": 10},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["wpm"] == 60000.0
+
+
