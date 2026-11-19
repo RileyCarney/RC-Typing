@@ -64,7 +64,7 @@ class KeystrokeEvent(BaseModel):
     t_ms: int = Field(..., ge=0, description="Timestamp offset relative to start in milliseconds")
     key: str = Field(..., description="Key value (e.g. 'a', 'Enter', 'Backspace')")
     type: str = Field(..., description="'keydown' or 'keyup'")
-    is_trusted: bool = Field(True, description="Whether isTrusted was true in the browser event")
+    is_trusted: bool = Field(default=True, description="Whether isTrusted was true in the browser event")
 
 
 class TrustTier(str, enum.Enum):
@@ -76,21 +76,21 @@ class TrustTier(str, enum.Enum):
 class CertificatePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: int = Field(1, description="Certificate schema version")
+    version: int = Field(default=1, description="Certificate schema version")
     cert_id: str = Field(..., description="Unique UUID for this certificate")
     issued_at: str = Field(..., description="ISO 8601 UTC timestamp of certificate generation")
     subject: str = Field(..., max_length=64, description="User-supplied display name")
     category: str = Field(..., description="Category: code, prose, reading, technical, formal, conversational")
-    language: Optional[str] = Field(None, description="Subcategory/language for code: python, cpp, sql, etc.")
+    language: Optional[str] = Field(default=None, description="Subcategory/language for code: python, cpp, sql, etc.")
     passage_id: str = Field(..., description="Identifier of the passage typed")
     passage_sha256: str = Field(..., min_length=64, max_length=64, description="SHA-256 of canonical passage text")
     metrics: Metrics = Field(..., description="Computed speed and accuracy metrics")
     keystroke_log_sha256: str = Field(..., min_length=64, max_length=64, description="SHA-256 of keystroke JSON log")
-    integrity: str = Field("clean", description="'clean' or 'flagged' by anti-cheat heuristics")
-    assurance: str = Field("heuristic-checked", description="'self-attested', 'heuristic-checked', or 'proctored'")
+    integrity: str = Field(default="clean", description="'clean' or 'flagged' by anti-cheat heuristics")
+    assurance: str = Field(default="heuristic-checked", description="'self-attested', 'heuristic-checked', or 'proctored'")
     nonce: str = Field(..., min_length=16, description="Cryptographic server nonce for this session")
     issuer_id: str = Field(..., description="SHA-256 fingerprint of issuer public key")
-    alg: str = Field("Ed25519", description="Signature algorithm")
+    alg: str = Field(default="Ed25519", description="Signature algorithm")
 
     @field_validator("subject", mode="before")
     @classmethod

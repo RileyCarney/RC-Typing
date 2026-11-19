@@ -77,6 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupTabs() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (btn.classList.contains('active')) return;
+
       document.querySelectorAll('.nav-btn').forEach(b => {
         b.classList.remove('active');
         b.removeAttribute('aria-current');

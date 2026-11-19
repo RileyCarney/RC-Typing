@@ -472,6 +472,7 @@ def test_stats_exclude_flagged_and_publish_retry_resets_backoff():
 
         with get_app_session() as db:
             job = db.query(PublishJobModel).filter(PublishJobModel.cert_id == cert_id).first()
+            assert job is not None
             assert job.state == "pending"
             assert job.attempts == 0
             next_at = job.next_attempt_at.replace(tzinfo=datetime.timezone.utc)
@@ -672,7 +673,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
             elif tag == "button" and self.in_nav:
                 self.in_button = True
                 self.current_btn_parts = []
-            elif tag == "path" and self.in_button and "pencil-circle-path" in attr_map.get("class", ""):
+            elif tag == "path" and self.in_button and "pencil-circle-path" in (attr_map.get("class") or ""):
                 self.nav_button_circle_paths += 1
             elif tag == "section" and attr_map.get("id") == "tab-settings":
                 self.in_settings = True
@@ -681,8 +682,10 @@ def test_notebook_ui_menu_settings_info_and_footer():
                 self.settings_depth += 1
             elif tag == "footer":
                 self.in_footer = True
-            elif tag == "a" and self.in_footer and "href" in attr_map:
-                self.footer_links.append(attr_map["href"])
+            elif tag == "a" and self.in_footer:
+                href = attr_map.get("href")
+                if href is not None:
+                    self.footer_links.append(href)
 
         def handle_endtag(self, tag):
             if tag == "button" and self.in_button:
@@ -746,5 +749,78 @@ def test_notebook_ui_menu_settings_info_and_footer():
         css_resp = client.get("/static/styles.css")
         assert css_resp.status_code == 200
         assert ".pencil-circle-path" in css_resp.text
+        assert re.search(r"\.nav-btn\.active\s+\.pencil-circle-path", css_resp.text)
         assert re.search(r"\.nav-btn:hover\s+\.pencil-circle-path", css_resp.text)
         assert "prefers-reduced-motion" in css_resp.text
+
+
+def test_live_test_stat_values_use_pixel_font_exclusively():
+    import re
+    from html.parser import HTMLParser
+
+    class _StatParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.pixel_elements: list[str] = []
+            self.card_stack: list[dict[str, str]] = []
+            self.cards: list[dict[str, str]] = []
+            self.in_value = False
+            self.in_label = False
+            self.current_label: list[str] = []
+
+        def handle_starttag(self, tag, attrs):
+            attr_map = dict(attrs)
+            class_attr = attr_map.get("class") or ""
+            classes = class_attr.split()
+            el_id = attr_map.get("id") or ""
+            if "pixel-stat-value" in classes:
+                self.pixel_elements.append(el_id)
+            if "stat-card" in classes:
+                self.card_stack.append({"value_id": "", "value_classes": "", "label": ""})
+            elif self.card_stack and "stat-value" in classes:
+                self.in_value = True
+                self.card_stack[-1]["value_id"] = el_id
+                self.card_stack[-1]["value_classes"] = class_attr
+            elif self.card_stack and "stat-label" in classes:
+                self.in_label = True
+                self.current_label = []
+
+        def handle_endtag(self, tag):
+            if self.in_value and tag == "div":
+                self.in_value = False
+            elif self.in_label and tag == "div":
+                self.in_label = False
+                if self.card_stack:
+                    self.card_stack[-1]["label"] = " ".join("".join(self.current_label).split())
+            elif self.card_stack and tag == "div" and not self.in_value and not self.in_label:
+                self.cards.append(self.card_stack.pop())
+
+        def handle_data(self, data):
+            if self.in_label:
+                self.current_label.append(data)
+
+    with TestClient(app) as client:
+        html_resp = client.get("/")
+        assert html_resp.status_code == 200
+        html = html_resp.text
+        assert "Press+Start+2P" in html
+
+        parser = _StatParser()
+        parser.feed(html)
+
+        assert parser.pixel_elements == ["live-wpm", "live-accuracy", "live-time"]
+        pixel_labels = [c["label"] for c in parser.cards if "pixel-stat-value" in c["value_classes"].split()]
+        assert pixel_labels == ["Net WPM", "Accuracy", "Time"]
+
+        non_pixel_ids = [c["value_id"] for c in parser.cards if "pixel-stat-value" not in c["value_classes"].split()]
+        assert non_pixel_ids == [
+            "thought-live-wpm",
+            "thought-live-time",
+            "thought-live-chars",
+            "thought-active-folder-label",
+        ]
+
+        css_resp = client.get("/static/styles.css")
+        assert css_resp.status_code == 200
+        assert "--font-pixel: 'Press Start 2P', monospace;" in css_resp.text
+        assert re.search(r"\.stat-value\.pixel-stat-value\s*\{[^}]*font-family:\s*var\(--font-pixel\)", css_resp.text)

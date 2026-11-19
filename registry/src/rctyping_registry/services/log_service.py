@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import threading
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from rctyping_common.canonical import canonical_json_dumps
@@ -22,6 +22,11 @@ class LogService:
         self.tree = MerkleTree()
         self._lock = threading.RLock()
 
+    @property
+    def lock(self) -> threading.RLock:
+        """Return the reentrant lock synchronizing transparency log mutations and reads."""
+        return self._lock
+
     def sync_from_db(self, db: Session) -> None:
         """Load all existing log entry hashes in index order into in-memory tree."""
         with self._lock:
@@ -31,7 +36,7 @@ class LogService:
     def append_certificate(
         self,
         cert_id: str,
-        envelope_dict: dict,
+        envelope_dict: dict[str, Any],
         db: Session,
         commit: bool = True,
     ) -> Tuple[int, int, InclusionProof, SignedTreeHead]:

@@ -99,10 +99,18 @@ def verify_certificate(cert_path: str, pubkey_path: Optional[str] = None, regist
     if pubkey_path:
         with open(pubkey_path, "r", encoding="utf-8") as f:
             pub_data = f.read()
-        pub = serialization.load_pem_public_key(pub_data.encode("utf-8"))
+        loaded_pub = serialization.load_pem_public_key(pub_data.encode("utf-8"))
+        if not isinstance(loaded_pub, ed25519.Ed25519PublicKey):
+            print("[FAIL] Provided PEM is not an Ed25519 public key.", file=sys.stderr)
+            return False
+        pub = loaded_pub
     else:
         if pub_str.startswith("-----BEGIN"):
-            pub = serialization.load_pem_public_key(pub_str.encode("utf-8"))
+            loaded_pub = serialization.load_pem_public_key(pub_str.encode("utf-8"))
+            if not isinstance(loaded_pub, ed25519.Ed25519PublicKey):
+                print("[FAIL] Certificate issuer_public_key PEM is not an Ed25519 public key.", file=sys.stderr)
+                return False
+            pub = loaded_pub
         else:
             raw_pub = b64url_decode(pub_str)
             pub = ed25519.Ed25519PublicKey.from_public_bytes(raw_pub)

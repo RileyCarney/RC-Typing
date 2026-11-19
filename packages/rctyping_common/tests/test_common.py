@@ -233,8 +233,10 @@ def test_corpus_repository(tmp_path):
     ]
     repo = CorpusRepository(passages)
     assert repo.get_by_id("p1") is not None
-    assert repo.get_random_passage("code", "python").id == "p1"
-    assert repo.get_random_passage("prose").id == "p2"
+    p1 = repo.get_random_passage("code", "python")
+    assert p1 is not None and p1.id == "p1"
+    p2 = repo.get_random_passage("prose")
+    assert p2 is not None and p2.id == "p2"
     cats = repo.list_categories()
     assert "code" in cats and "python" in cats["code"]
     assert "prose" in cats

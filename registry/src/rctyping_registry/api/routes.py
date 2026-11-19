@@ -5,9 +5,9 @@ from __future__ import annotations
 import datetime
 import hashlib
 import secrets
-from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from typing import Any
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from rctyping_common.canonical import canonical_json_dumps, canonical_json_hash
@@ -63,7 +63,7 @@ class RevocationRequest(BaseModel):
 
 
 @router.post("/issuers/challenge")
-def request_challenge(db: Session = Depends(get_registry_db)):
+def request_challenge(db: Session = Depends(get_registry_db)) -> dict[str, str]:
     """Generate a challenge for proof-of-possession during issuer registration."""
     now = datetime.datetime.now(datetime.timezone.utc)
     db.query(RegistrationChallengeModel).filter(RegistrationChallengeModel.expires_at < now).delete()
@@ -76,7 +76,7 @@ def request_challenge(db: Session = Depends(get_registry_db)):
 
 
 @router.post("/issuers")
-def register_issuer(req: IssuerRegistrationRequest, db: Session = Depends(get_registry_db)):
+def register_issuer(req: IssuerRegistrationRequest, db: Session = Depends(get_registry_db)) -> dict[str, str]:
     """Register an issuer's public key by verifying proof of possession of the private key."""
     # 1. Verify challenge exists and not expired
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -126,7 +126,7 @@ def register_issuer(req: IssuerRegistrationRequest, db: Session = Depends(get_re
 
 
 @router.get("/issuers/{issuer_id}")
-def get_issuer(issuer_id: str, db: Session = Depends(get_registry_db)):
+def get_issuer(issuer_id: str, db: Session = Depends(get_registry_db)) -> dict[str, str]:
     issuer = db.query(IssuerModel).filter(IssuerModel.id == issuer_id).first()
     if not issuer:
         raise HTTPException(status_code=404, detail="Issuer not found")
@@ -146,7 +146,7 @@ def publish_certificate(
     x_signature: str = Header(..., alias="X-Signature"),
     db: Session = Depends(get_registry_db),
     log_service: LogService = Depends(get_log_service),
-):
+) -> RegistryReceipt:
     """Publish a signed certificate to the transparency log."""
     # 1. Lookup issuer
     issuer = db.query(IssuerModel).filter(IssuerModel.id == x_issuer_id).first()
@@ -178,12 +178,14 @@ def publish_certificate(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid issued_at timestamp")
 
-    with log_service._lock:
+    with log_service.lock:
         # 4. Check idempotency: if already recorded, return existing receipt
         existing = db.query(CertificateRecordModel).filter(CertificateRecordModel.cert_id == cert_id).first()
         if existing:
             proof = log_service.get_inclusion_proof(existing.leaf_index)
             head = log_service.get_latest_tree_head(db)
+            if head is None:
+                raise HTTPException(status_code=500, detail="Missing signed tree head for existing certificate")
             return RegistryReceipt(
                 cert_id=cert_id,
                 cert_sha256=existing.sha256,
@@ -237,12 +239,12 @@ def get_certificate_record(
     cert_id: str,
     db: Session = Depends(get_registry_db),
     log_service: LogService = Depends(get_log_service),
-):
+) -> dict[str, Any]:
     rec = db.query(CertificateRecordModel).filter(CertificateRecordModel.cert_id == cert_id).first()
     if not rec:
         raise HTTPException(status_code=404, detail="Certificate not found in registry")
 
-    with log_service._lock:
+    with log_service.lock:
         proof = log_service.get_inclusion_proof(rec.leaf_index)
         head = log_service.get_latest_tree_head(db)
         tree_size = log_service.tree.size
@@ -269,7 +271,7 @@ def revoke_certificate(
     x_timestamp: str = Header(..., alias="X-Timestamp"),
     x_signature: str = Header(..., alias="X-Signature"),
     db: Session = Depends(get_registry_db),
-):
+) -> dict[str, str]:
     rec = db.query(CertificateRecordModel).filter(CertificateRecordModel.cert_id == cert_id).first()
     if not rec:
         raise HTTPException(status_code=404, detail="Certificate not found")
@@ -299,7 +301,7 @@ def revoke_certificate(
 
 
 @router.get("/log/head", response_model=SignedTreeHead)
-def get_tree_head(db: Session = Depends(get_registry_db), log_service: LogService = Depends(get_log_service)):
+def get_tree_head(db: Session = Depends(get_registry_db), log_service: LogService = Depends(get_log_service)) -> SignedTreeHead:
     head = log_service.get_latest_tree_head(db)
     if not head:
         raise HTTPException(status_code=404, detail="No log entries present")
@@ -310,7 +312,7 @@ def get_tree_head(db: Session = Depends(get_registry_db), log_service: LogServic
 def get_inclusion_proof_endpoint(
     leaf_index: int = Query(..., ge=0),
     log_service: LogService = Depends(get_log_service),
-):
+) -> InclusionProof:
     try:
         return log_service.get_inclusion_proof(leaf_index)
     except IndexError as e:
@@ -321,7 +323,7 @@ def get_inclusion_proof_endpoint(
 def get_consistency_proof_endpoint(
     from_size: int = Query(..., ge=0),
     log_service: LogService = Depends(get_log_service),
-):
+) -> dict[str, Any]:
     try:
         path = log_service.get_consistency_proof(from_size)
         return {"from_size": from_size, "to_size": log_service.tree.size, "consistency_path": path}
@@ -335,7 +337,7 @@ def update_issuer_tier(
     tier: TrustTier,
     x_admin_token: str = Header(..., alias="X-Admin-Token"),
     db: Session = Depends(get_registry_db),
-):
+) -> dict[str, str]:
     if not secrets.compare_digest(x_admin_token, registry_settings.admin_token):
         raise HTTPException(status_code=403, detail="Invalid admin token")
     issuer = db.query(IssuerModel).filter(IssuerModel.id == issuer_id).first()
