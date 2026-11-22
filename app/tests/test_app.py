@@ -265,7 +265,7 @@ def test_favicon_served():
         assert static_resp.status_code == 200
 
 
-def test_typing_thoughts_brain_encryption_folders_and_zip_export():
+def test_typing_thoughts_storage_encryption_folders_and_zip_export():
     import io
     import zipfile
     import rctyping_app.main as app_main
@@ -277,7 +277,7 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
         html_resp = client.get("/")
         assert html_resp.status_code == 200
         assert "Typing Thoughts" in html_resp.text
-        assert "Export Brain (.zip)" in html_resp.text
+        assert "Export Storage (.zip)" in html_resp.text
 
         # 1. Create root folder and nested folder
         f_root_resp = client.post("/api/thoughts/folders", json={"name": "Projects"})
@@ -294,18 +294,18 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
         assert ideas_folder["path"] == "Projects/Ideas"
 
         # 2. Push thoughts (one in root, one in Projects)
-        thought_text = "Build a fast local-first encrypted brain for typing thoughts."
+        thought_text = "Build a fast local-first encrypted storage for typing thoughts."
         t1_resp = client.post(
             "/api/thoughts",
             json={
                 "content": thought_text,
                 "duration_ms": 6000,
-                "filename": "brain-architecture",
+                "filename": "storage-architecture",
             },
         )
         assert t1_resp.status_code == 200
         t1 = t1_resp.json()
-        assert t1["filename"] == "brain-architecture.md"
+        assert t1["filename"] == "storage-architecture.md"
         assert t1["wpm"] > 0
         assert t1["duration_ms"] == 6000
         assert t1["total_time"] == "6.0s"
@@ -347,7 +347,7 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
         assert moved["folder_path"] == "Projects/Ideas"
         assert 'folder: "Projects/Ideas"' in moved["markdown"]
 
-        # 5. Export Brain as .zip and verify .md files and folder structure
+        # 5. Export Storage as .zip and verify .md files and folder structure
         zip_resp = client.get("/api/thoughts/export-zip")
         assert zip_resp.status_code == 200
         assert "application/zip" in zip_resp.headers.get("content-type", "")
@@ -364,10 +364,10 @@ def test_typing_thoughts_brain_encryption_folders_and_zip_export():
         # 6. Deleting a folder preserves thoughts by moving them up to parent and updates markdown frontmatter
         del_sub = client.delete(f"/api/thoughts/folders/{ideas_folder['id']}")
         assert del_sub.status_code == 200
-        brain_resp = client.get("/api/thoughts/brain")
-        assert brain_resp.status_code == 200
-        brain_data = brain_resp.json()
-        t1_after = next(t for t in brain_data["thoughts"] if t["id"] == t1["id"])
+        storage_resp = client.get("/api/thoughts/storage")
+        assert storage_resp.status_code == 200
+        storage_data = storage_resp.json()
+        t1_after = next(t for t in storage_data["thoughts"] if t["id"] == t1["id"])
         assert t1_after["folder_id"] == projects_folder["id"]
         assert 'folder: "Projects"' in t1_after["markdown"]
 
@@ -821,15 +821,26 @@ def test_live_test_stat_values_use_pixel_font_exclusively():
         parser = _StatParser()
         parser.feed(html)
 
-        assert parser.pixel_elements == ["live-wpm", "live-accuracy", "live-time"]
-        pixel_labels = [c["label"] for c in parser.cards if "pixel-stat-value" in c["value_classes"].split()]
-        assert pixel_labels == ["Net WPM", "Accuracy", "Time"]
-
-        non_pixel_ids = [c["value_id"] for c in parser.cards if "pixel-stat-value" not in c["value_classes"].split()]
-        assert non_pixel_ids == [
+        assert parser.pixel_elements == [
+            "live-wpm",
+            "live-accuracy",
+            "live-time",
             "thought-live-wpm",
             "thought-live-time",
             "thought-live-chars",
+        ]
+        pixel_labels = [c["label"] for c in parser.cards if "pixel-stat-value" in c["value_classes"].split()]
+        assert pixel_labels == [
+            "Net WPM",
+            "Accuracy",
+            "Time",
+            "Speed (WPM)",
+            "Total Time",
+            "Characters",
+        ]
+
+        non_pixel_ids = [c["value_id"] for c in parser.cards if "pixel-stat-value" not in c["value_classes"].split()]
+        assert non_pixel_ids == [
             "thought-active-folder-label",
         ]
 

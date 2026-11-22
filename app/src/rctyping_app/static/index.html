@@ -128,15 +128,15 @@
         <section id="tab-thoughts" class="tab-content">
           <div class="live-stats">
             <div class="stat-card">
-              <div class="stat-value" id="thought-live-wpm">0</div>
+              <div class="stat-value pixel-stat-value" id="thought-live-wpm">0</div>
               <div class="stat-label">Speed (WPM)</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value" id="thought-live-time">0.0s</div>
+              <div class="stat-value pixel-stat-value" id="thought-live-time">0.0s</div>
               <div class="stat-label">Total Time</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value" id="thought-live-chars">0</div>
+              <div class="stat-value pixel-stat-value" id="thought-live-chars">0</div>
               <div class="stat-label">Characters</div>
             </div>
             <div class="stat-card">
@@ -196,9 +196,9 @@
         <!-- TAB 3: VERIFY CERTIFICATE -->
         <section id="tab-verify" class="tab-content">
           <div class="passage-card">
-            <h2>Cryptographic Certificate Verifier</h2>
+            <h2>Certificate Verifier</h2>
             <p class="muted-note" style="margin: 0.5rem 0 1.5rem 0; font-size: 0.95rem;">
-              Mathematically verify Ed25519 digital signatures on rc-typing certificate JSON files and check Merkle transparency log inclusion proofs against the shared public registry.
+              Verify the digital signatures on certificate JSON file.
             </p>
 
             <label for="cert-json-input" style="display:block; margin-bottom:0.5rem;">Paste Certificate JSON or drop file:</label>
@@ -224,20 +224,20 @@
         <!-- TAB 4: SETTINGS -->
         <section id="tab-settings" class="tab-content">
           <div class="passage-card" style="margin-bottom: 1.5rem;">
-            <h2>Application &amp; Registry Settings</h2>
+            <h2>Application Settings</h2>
             <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 600px;">
               <div>
                 <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; color: var(--text-main); font-size: 1rem;">
                   <input type="checkbox" id="setting-auto-publish" style="width: 1.15rem; height: 1.15rem;">
-                  <strong>Auto-publish certificates to Public Registry (Default: Enabled)</strong>
+                  <strong>Auto-publish certificates to Public Registry:</strong>
                 </label>
                 <p class="muted-note" style="font-size: 0.85rem; margin: 0.4rem 0 0 2rem;">
-                  When enabled, signed certificate envelopes are submitted to the transparency log. Your keystrokes remain private on your machine; only their cryptographic SHA-256 hash and metrics are published.
+                  When enabled, certificates are submitted. These are metrics that are published for confirmation.
                 </p>
               </div>
 
               <div>
-                <label for="setting-default-name" style="display:block; margin-bottom:0.4rem;">Default Certificate Display Name:</label>
+                <label for="setting-default-name" style="display:block; margin-bottom:0.4rem;">Certificate Display Name</label>
                 <input type="text" id="setting-default-name" style="width: 100%;" placeholder="e.g. Satoshi Typist">
                 <p class="muted-note" style="font-size: 0.82rem; margin-top: 0.25rem;">
                   Free-form label included in signed certificates. Stripped of control and bidi-override characters.
@@ -256,11 +256,21 @@
             </div>
           </div>
 
+          <div class="passage-card" style="margin-bottom: 1.5rem;">
+            <h2>Typing Performance History</h2>
+            <p class="muted-note" style="margin: 0.5rem 0 1.25rem 0; font-size: 0.92rem;">
+              Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
+            </p>
+            <div id="stats-container">
+              <p class="muted-note">Loading stats...</p>
+            </div>
+          </div>
+
           <section id="application-information" class="passage-card" style="margin-bottom: 1.5rem;" aria-labelledby="app-info-heading">
             <h2 id="app-info-heading">Application Information</h2>
             <div class="app-info-grid">
               <div class="app-info-item">
-                <div class="app-info-label">Application</div>
+                <div class="app-info-label">Github</div>
                 <div class="app-info-value">rc-typing</div>
               </div>
               <div class="app-info-item">
@@ -272,8 +282,8 @@
                 <div class="app-info-value">RFC 8785 Canonical JSON</div>
               </div>
               <div class="app-info-item">
-                <div class="app-info-label">Digital Signatures</div>
-                <div class="app-info-value">Ed25519 <span class="badge-tag">Ed25519 Verified</span></div>
+                <div class="app-info-label">Digital Signature</div>
+                <div class="app-info-value">Ed25519</div>
               </div>
               <div class="app-info-item">
                 <div class="app-info-label">Audit Log</div>
@@ -281,16 +291,6 @@
               </div>
             </div>
           </section>
-
-          <div class="passage-card">
-            <h2>Performance Across Categories of Thought</h2>
-            <p class="muted-note" style="margin: 0.5rem 0 1.25rem 0; font-size: 0.92rem;">
-              Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
-            </p>
-            <div id="stats-container">
-              <p class="muted-note">Loading stats...</p>
-            </div>
-          </div>
         </section>
       </main>
 
