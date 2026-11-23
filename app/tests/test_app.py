@@ -1038,4 +1038,89 @@ def test_file_explorer_labels():
         assert "Brain /" not in js
 
 
+def test_typing_thoughts_bottom_hovering_stats_dock():
+    import re
+    from html.parser import HTMLParser
+
+    class _DockParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_dock = False
+            self.dock_depth = 0
+            self.dock_stat_ids: list[str] = []
+            self.dock_hidden = False
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            attr_map = dict(attrs)
+            if attr_map.get("id") == "thoughts-stats-dock":
+                self.in_dock = True
+                self.dock_depth = 1
+                self.dock_hidden = "hidden" in attr_map
+            elif self.in_dock and tag == "div":
+                self.dock_depth += 1
+            if self.in_dock and attr_map.get("id") in {
+                "thought-live-wpm",
+                "thought-live-time",
+                "thought-live-chars",
+                "thought-active-folder-label",
+            }:
+                self.dock_stat_ids.append(attr_map["id"] or "")
+
+        def handle_endtag(self, tag: str) -> None:
+            if self.in_dock and tag == "div":
+                self.dock_depth -= 1
+                if self.dock_depth == 0:
+                    self.in_dock = False
+
+    with _test_client() as client:
+        html = client.get("/").text
+        parser = _DockParser()
+        parser.feed(html)
+        assert parser.dock_hidden is True
+        assert parser.dock_stat_ids == [
+            "thought-live-wpm",
+            "thought-live-time",
+            "thought-live-chars",
+            "thought-active-folder-label",
+        ]
+
+        css = client.get("/static/styles.css").text
+        dock_match = re.search(r"\.thoughts-stats-dock\s*\{([^}]*)\}", css)
+        assert dock_match is not None
+        dock_block = dock_match.group(1)
+        assert "position: fixed;" in dock_block
+        assert "bottom: 0;" in dock_block
+        assert re.search(r"border-radius:\s*\d+px\s+\d+px\s+0\s+0;", dock_block)
+        assert "border-bottom: none;" in dock_block
+
+        js = client.get("/static/app.js").text
+        assert "getElementById('thoughts-stats-dock')" in js
+        assert "thoughts-tab-active" in js
+
+
+
+def test_typing_test_category_sidebar_dropdown_and_code_submenu():
+    with _test_client() as client:
+        html = client.get("/").text
+        assert 'class="test-layout"' in html
+        assert 'class="category-sidebar"' in html
+        assert 'id="category-sidebar-title" class="category-sidebar-title">Category of thought</h2>' in html
+        assert 'id="category-dropdown" class="category-dropdown" open' in html
+        assert 'id="category-list"' in html
+        assert 'id="code-language-submenu"' in html
+        assert 'data-category="code"' in html
+        for lang in ("python", "powershell", "cpp", "csharp", "javascript", "typescript", "sql"):
+            assert f'data-language="{lang}"' in html
+        assert html.index('data-category="code"') < html.index('id="code-language-submenu"') < html.index('data-category="prose"')
+
+        css = client.get("/static/styles.css").text
+        assert ".test-layout" in css
+        assert 'grid-template-areas: "sidebar main";' in css
+        assert ".language-submenu[hidden]" in css
+
+        js = client.get("/static/app.js").text
+        assert "languageSubmenu.hidden = selectedCategory !== 'code';" in js
+
+
+
 

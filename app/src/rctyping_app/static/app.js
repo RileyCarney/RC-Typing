@@ -20,9 +20,10 @@ function escapeHtml(val) {
 }
 
 // DOM Elements
-const categorySelect = document.getElementById('category-select');
-const languageGroup = document.getElementById('language-group');
-const languageSelect = document.getElementById('language-select');
+const categorySelectedLabel = document.getElementById('category-selected-label');
+const categoryButtons = Array.from(document.querySelectorAll('#category-list .category-item'));
+const languageSubmenu = document.getElementById('code-language-submenu');
+const languageButtons = Array.from(document.querySelectorAll('#code-language-submenu .submenu-item'));
 const newPassageBtn = document.getElementById('new-passage-btn');
 const typingViewport = document.getElementById('typing-viewport');
 const passageTitle = document.getElementById('passage-title');
@@ -31,6 +32,45 @@ const focusHint = document.getElementById('focus-hint');
 const liveWpm = document.getElementById('live-wpm');
 const liveAcc = document.getElementById('live-accuracy');
 const liveTime = document.getElementById('live-time');
+
+let selectedCategory = 'code';
+let selectedLanguage = 'python';
+
+function syncCategoryMenuUI() {
+  let activeCategoryLabel = 'Programming Code';
+  let activeLanguageLabel = 'Python';
+
+  categoryButtons.forEach((btn) => {
+    const isSelected = btn.dataset.category === selectedCategory;
+    btn.classList.toggle('active', isSelected);
+    btn.setAttribute('aria-pressed', String(isSelected));
+    if (btn.dataset.category === 'code') {
+      btn.setAttribute('aria-expanded', String(isSelected));
+    }
+    if (isSelected) {
+      activeCategoryLabel = btn.dataset.label || btn.textContent.trim();
+    }
+  });
+
+  if (languageSubmenu) {
+    languageSubmenu.hidden = selectedCategory !== 'code';
+  }
+
+  languageButtons.forEach((btn) => {
+    const isSelected = btn.dataset.language === selectedLanguage;
+    btn.classList.toggle('active', isSelected);
+    btn.setAttribute('aria-pressed', String(isSelected));
+    if (isSelected) {
+      activeLanguageLabel = btn.dataset.label || btn.textContent.trim();
+    }
+  });
+
+  if (categorySelectedLabel) {
+    categorySelectedLabel.textContent = selectedCategory === 'code'
+      ? `${activeCategoryLabel} · ${activeLanguageLabel}`
+      : activeCategoryLabel;
+  }
+}
 
 // Modal Elements
 const certModal = document.getElementById('cert-modal');
@@ -43,14 +83,30 @@ document.addEventListener('DOMContentLoaded', () => {
   setupTabs();
   setupSettings();
   setupTypingThoughts();
+  syncCategoryMenuUI();
   loadNewPassage();
 
-  categorySelect.addEventListener('change', () => {
-    languageGroup.style.display = categorySelect.value === 'code' ? 'block' : 'none';
-    loadNewPassage();
+  categoryButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const nextCategory = btn.dataset.category;
+      if (!nextCategory) return;
+      selectedCategory = nextCategory;
+      syncCategoryMenuUI();
+      loadNewPassage();
+    });
   });
 
-  languageSelect.addEventListener('change', loadNewPassage);
+  languageButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const nextLanguage = btn.dataset.language;
+      if (!nextLanguage) return;
+      selectedCategory = 'code';
+      selectedLanguage = nextLanguage;
+      syncCategoryMenuUI();
+      loadNewPassage();
+    });
+  });
+
   newPassageBtn.addEventListener('click', loadNewPassage);
 
   typingViewport.addEventListener('keydown', handleKeyDown);
@@ -90,7 +146,16 @@ function setupTabs() {
       const tabId = `tab-${btn.dataset.tab}`;
       document.getElementById(tabId).classList.add('active');
 
-      if (btn.dataset.tab === 'thoughts') {
+      const isThoughts = btn.dataset.tab === 'thoughts';
+      const thoughtsDock = document.getElementById('thoughts-stats-dock');
+      if (thoughtsDock) {
+        thoughtsDock.classList.toggle('active', isThoughts);
+        thoughtsDock.hidden = !isThoughts;
+      }
+      document.documentElement.classList.toggle('thoughts-tab-active', isThoughts);
+      document.body.classList.toggle('thoughts-tab-active', isThoughts);
+
+      if (isThoughts) {
         loadBrain();
         document.getElementById('thought-input')?.focus();
       }
@@ -105,8 +170,8 @@ function setupTabs() {
 // --- Session & Passage Loading ---
 async function loadNewPassage() {
   resetTestState();
-  const category = categorySelect.value;
-  const language = category === 'code' ? languageSelect.value : null;
+  const category = selectedCategory;
+  const language = category === 'code' ? selectedLanguage : null;
 
   try {
     const res = await fetch('/api/sessions', {

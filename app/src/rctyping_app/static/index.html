@@ -66,85 +66,108 @@
       <main>
         <!-- TAB 1: TYPING TEST -->
         <section id="tab-test" class="tab-content active">
-          <div class="controls-bar">
-            <div class="category-group">
-              <label for="category-select">Category of Thought:</label>
-              <select id="category-select">
-                <option value="code">Programming Code</option>
-                <option value="prose">Prose &amp; Literature</option>
-                <option value="reading">Reading &amp; Encyclopedic</option>
-                <option value="technical">Technical &amp; Scientific</option>
-                <option value="formal">Formal &amp; Legal</option>
-                <option value="conversational">Conversational Dialogue</option>
-              </select>
+          <div class="test-layout">
+            <aside class="category-sidebar" aria-labelledby="category-sidebar-title">
+              <h2 id="category-sidebar-title" class="category-sidebar-title">Category of thought</h2>
 
-              <div id="language-group">
-                <label for="language-select">Language:</label>
-                <select id="language-select">
-                  <option value="python">Python</option>
-                  <option value="powershell">PowerShell</option>
-                  <option value="cpp">C++</option>
-                  <option value="csharp">C#</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="typescript">TypeScript</option>
-                  <option value="sql">SQL</option>
-                </select>
+              <details id="category-dropdown" class="category-dropdown" open>
+                <summary class="category-dropdown-trigger">
+                  <span id="category-selected-label" class="category-selected-label">Programming Code &middot; Python</span>
+                  <span class="dropdown-chevron" aria-hidden="true">&#9662;</span>
+                </summary>
+
+                <ul id="category-list" class="category-list" aria-label="Category of thought">
+                  <li class="category-list-item has-submenu">
+                    <button
+                      type="button"
+                      class="category-item active"
+                      data-category="code"
+                      data-label="Programming Code"
+                      aria-pressed="true"
+                      aria-expanded="true"
+                      aria-controls="code-language-submenu"
+                    >
+                      <span class="category-item-label">Programming Code</span>
+                      <span class="submenu-chevron" aria-hidden="true">&#9662;</span>
+                    </button>
+
+                    <ul id="code-language-submenu" class="language-submenu" aria-label="Programming Language">
+                      <li><button type="button" class="submenu-item active" data-language="python" data-label="Python" aria-pressed="true">Python</button></li>
+                      <li><button type="button" class="submenu-item" data-language="powershell" data-label="PowerShell" aria-pressed="false">PowerShell</button></li>
+                      <li><button type="button" class="submenu-item" data-language="cpp" data-label="C++" aria-pressed="false">C++</button></li>
+                      <li><button type="button" class="submenu-item" data-language="csharp" data-label="C#" aria-pressed="false">C#</button></li>
+                      <li><button type="button" class="submenu-item" data-language="javascript" data-label="JavaScript" aria-pressed="false">JavaScript</button></li>
+                      <li><button type="button" class="submenu-item" data-language="typescript" data-label="TypeScript" aria-pressed="false">TypeScript</button></li>
+                      <li><button type="button" class="submenu-item" data-language="sql" data-label="SQL" aria-pressed="false">SQL</button></li>
+                    </ul>
+                  </li>
+                  <li class="category-list-item">
+                    <button type="button" class="category-item" data-category="prose" data-label="Prose &amp; Literature" aria-pressed="false">
+                      <span class="category-item-label">Prose &amp; Literature</span>
+                    </button>
+                  </li>
+                  <li class="category-list-item">
+                    <button type="button" class="category-item" data-category="reading" data-label="Reading &amp; Encyclopedic" aria-pressed="false">
+                      <span class="category-item-label">Reading &amp; Encyclopedic</span>
+                    </button>
+                  </li>
+                  <li class="category-list-item">
+                    <button type="button" class="category-item" data-category="technical" data-label="Technical &amp; Scientific" aria-pressed="false">
+                      <span class="category-item-label">Technical &amp; Scientific</span>
+                    </button>
+                  </li>
+                  <li class="category-list-item">
+                    <button type="button" class="category-item" data-category="formal" data-label="Formal &amp; Legal" aria-pressed="false">
+                      <span class="category-item-label">Formal &amp; Legal</span>
+                    </button>
+                  </li>
+                  <li class="category-list-item">
+                    <button type="button" class="category-item" data-category="conversational" data-label="Conversational Dialogue" aria-pressed="false">
+                      <span class="category-item-label">Conversational Dialogue</span>
+                    </button>
+                  </li>
+                </ul>
+              </details>
+            </aside>
+
+            <div class="test-main">
+              <!-- Live Stats -->
+              <div class="live-stats">
+                <div class="stat-card">
+                  <div class="stat-value pixel-stat-value" id="live-wpm">0</div>
+                  <div class="stat-label">Net WPM</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value pixel-stat-value" id="live-accuracy">100%</div>
+                  <div class="stat-label">Accuracy</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value pixel-stat-value" id="live-time">0.0s</div>
+                  <div class="stat-label">Time</div>
+                </div>
+              </div>
+
+              <div class="test-toolbar">
+                <button type="button" id="new-passage-btn" class="btn">New Passage (Ctrl + Enter)</button>
+              </div>
+
+              <!-- Passage Viewport -->
+              <div class="passage-card" id="passage-container">
+                <div class="passage-meta">
+                  <span id="passage-title">Loading passage...</span>
+                  <span id="passage-license">License: MIT</span>
+                </div>
+
+                <div id="typing-viewport" class="typing-viewport" tabindex="0"></div>
+
+                <div class="focus-notice" id="focus-hint">Click inside or start typing to begin test</div>
               </div>
             </div>
-
-            <button type="button" id="new-passage-btn" class="btn">New Passage (Ctrl + Enter)</button>
-          </div>
-
-          <!-- Live Stats -->
-          <div class="live-stats">
-            <div class="stat-card">
-              <div class="stat-value pixel-stat-value" id="live-wpm">0</div>
-              <div class="stat-label">Net WPM</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value pixel-stat-value" id="live-accuracy">100%</div>
-              <div class="stat-label">Accuracy</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value pixel-stat-value" id="live-time">0.0s</div>
-              <div class="stat-label">Time</div>
-            </div>
-          </div>
-
-          <!-- Passage Viewport -->
-          <div class="passage-card" id="passage-container">
-            <div class="passage-meta">
-              <span id="passage-title">Loading passage...</span>
-              <span id="passage-license">License: MIT</span>
-            </div>
-
-            <div id="typing-viewport" class="typing-viewport" tabindex="0"></div>
-
-            <div class="focus-notice" id="focus-hint">Click inside or start typing to begin test</div>
           </div>
         </section>
 
         <!-- TAB 2: TYPING THOUGHTS -->
         <section id="tab-thoughts" class="tab-content">
-          <div class="live-stats">
-            <div class="stat-card">
-              <div class="stat-value pixel-stat-value" id="thought-live-wpm">0</div>
-              <div class="stat-label">Speed (WPM)</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value pixel-stat-value" id="thought-live-time">0.0s</div>
-              <div class="stat-label">Total Time</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value pixel-stat-value" id="thought-live-chars">0</div>
-              <div class="stat-label">Characters</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value thought-folder-stat" id="thought-active-folder-label">./</div>
-              <div class="stat-label">Target Folder</div>
-            </div>
-          </div>
-
           <div class="passage-card" style="margin-bottom: 1.5rem;">
             <div class="passage-meta">
               <span><strong>Typing Thoughts</strong> &mdash; Type a thought and press <code>Enter</code> to push as <code>.md</code> (<code>Shift+Enter</code> for newline)</span>
@@ -297,6 +320,28 @@
       <footer class="footer">
         <a href="https://carn.si" target="_blank" rel="noopener noreferrer">https://carn.si</a>
       </footer>
+    </div>
+  </div>
+
+  <!-- TYPING THOUGHTS HOVERING BOTTOM STATS DOCK -->
+  <div id="thoughts-stats-dock" class="thoughts-stats-dock" role="region" aria-label="Typing Thoughts live stats" hidden>
+    <div class="live-stats">
+      <div class="stat-card">
+        <div class="stat-value pixel-stat-value" id="thought-live-wpm">0</div>
+        <div class="stat-label">Speed (WPM)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value pixel-stat-value" id="thought-live-time">0.0s</div>
+        <div class="stat-label">Total Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value pixel-stat-value" id="thought-live-chars">0</div>
+        <div class="stat-label">Characters</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value thought-folder-stat" id="thought-active-folder-label">./</div>
+        <div class="stat-label">Target Folder</div>
+      </div>
     </div>
   </div>
 
