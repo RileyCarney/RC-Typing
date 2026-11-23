@@ -25,7 +25,7 @@ def sanitize_display_name(name: str) -> str:
     normalized = unicodedata.normalize("NFC", str(name))
 
     # Strip control chars, bidi overrides (U+202A to U+202E, U+2066 to U+2069), zero-width chars
-    cleaned_chars = []
+    cleaned_chars: List[str] = []
     for ch in normalized:
         category = unicodedata.category(ch)
         cp = ord(ch)

@@ -1,7 +1,6 @@
 """FastAPI main application entrypoint for rc-typing Registry."""
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 from fastapi import FastAPI, Response
 from fastapi.responses import HTMLResponse
 
@@ -47,7 +46,7 @@ def create_registry_app() -> FastAPI:
     def get_registry_info():
         if registry_keystore is None or registry_log_service is None:
             return Response("Registry initializing", status_code=503)
-        with registry_log_service._lock:
+        with registry_log_service.lock:
             tree_size = registry_log_service.tree.size
             tree_root_hex = registry_log_service.tree.root_hex()
         return {

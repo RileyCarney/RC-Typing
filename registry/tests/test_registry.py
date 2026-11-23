@@ -1,10 +1,15 @@
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
 import datetime
 import hashlib
+from pathlib import Path
+from typing import cast
 import uuid
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from rctyping_common.canonical import canonical_json_dumps, canonical_json_hash
+from rctyping_common.canonical import canonical_json_dumps
 from rctyping_common.certificate import (
     b64url_decode,
     b64url_encode,
@@ -19,23 +24,25 @@ from rctyping_common.models import CertificatePayload, Metrics
 from rctyping_registry.main import app
 
 
+@contextmanager
+def _test_client() -> Generator[httpx.Client, None, None]:
+    with TestClient(app) as client:
+        yield cast(httpx.Client, client)
+
+
 @pytest.fixture(autouse=True)
-def isolated_registry_db(tmp_path, monkeypatch):
+def isolated_registry_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     import rctyping_registry.db.session as reg_db_session
     from rctyping_registry.config import registry_settings
 
-    if reg_db_session._engine is not None:
-        reg_db_session._engine.dispose()
-    monkeypatch.setattr(reg_db_session, "_engine", None)
-    monkeypatch.setattr(reg_db_session, "_SessionFactory", None)
+    reg_db_session.reset_registry_db()
     monkeypatch.setattr(registry_settings, "data_dir", tmp_path / "registry_data")
     yield
-    if reg_db_session._engine is not None:
-        reg_db_session._engine.dispose()
+    reg_db_session.reset_registry_db()
 
 
 def test_registry_lifecycle_and_transparency_log():
-    with TestClient(app) as client:
+    with _test_client() as client:
         # 1. Check registry info
         info_resp = client.get("/.well-known/rctyping-registry.json")
         assert info_resp.status_code == 200
@@ -281,7 +288,7 @@ def test_expired_registration_challenges_are_purged():
     from rctyping_registry.db.models import RegistrationChallengeModel
     from rctyping_registry.db.session import get_registry_session
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         with get_registry_session() as db:
             old_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
             db.add(RegistrationChallengeModel(challenge="expired-token", created_at=old_time, expires_at=old_time))

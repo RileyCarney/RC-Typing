@@ -365,7 +365,7 @@ def resolve_folder_path(folder_id: Optional[str], folders_by_id: Dict[str, Thoug
     if not folder_id:
         return ""
     parts: List[str] = []
-    seen = set()
+    seen: set[str] = set()
     curr_id: Optional[str] = folder_id
     while curr_id and curr_id in folders_by_id and curr_id not in seen:
         seen.add(curr_id)

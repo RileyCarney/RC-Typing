@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 import httpx
@@ -102,8 +103,8 @@ def cmd_verify(args: argparse.Namespace) -> None:
                     print("[!] Registry envelope does not match local certificate.", file=sys.stderr)
                     sys.exit(2)
 
-                proof = reg_data.get("inclusion_proof") or {}
-                head = reg_data.get("signed_tree_head") or {}
+                proof: dict[str, Any] = reg_data.get("inclusion_proof") or {}
+                head: dict[str, Any] = reg_data.get("signed_tree_head") or {}
                 if not proof or not head:
                     print("[!] Registry response missing inclusion proof or signed tree head.", file=sys.stderr)
                     sys.exit(2)

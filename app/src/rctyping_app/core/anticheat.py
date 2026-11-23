@@ -64,7 +64,7 @@ def evaluate_keystroke_integrity(
 
     # 4. Key Dwell Times (keydown to keyup)
     dwells: List[float] = []
-    keyup_dict = {}
+    keyup_dict: dict[str, list[int]] = {}
     for e in events:
         if e.type == "keyup":
             keyup_dict.setdefault(e.key, []).append(e.t_ms)

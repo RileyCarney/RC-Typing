@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import json
 import uuid
 import datetime
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 import pytest
 
 from rctyping_common.certificate import calculate_key_id, generate_keypair, sign_certificate
@@ -9,7 +13,7 @@ from rctyping_common.models import CertificatePayload, Metrics
 from verifier.verify_certificate import verify_certificate
 
 
-def test_standalone_verifier_script(tmp_path):
+def test_standalone_verifier_script(tmp_path: Path) -> None:
     priv, pub = generate_keypair()
     key_id = calculate_key_id(pub)
     cert_id = str(uuid.uuid4())
@@ -60,8 +64,9 @@ def test_standalone_verifier_script(tmp_path):
     assert verify_certificate(str(tampered_file)) is False
 
 
-def test_standalone_verifier_rejects_revoked_and_bad_proof(tmp_path, monkeypatch):
-    import io
+def test_standalone_verifier_rejects_revoked_and_bad_proof(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import urllib.request
     from rctyping_common.canonical import canonical_json_dumps
     from rctyping_common.merkle import MerkleTree
@@ -102,19 +107,31 @@ def test_standalone_verifier_rejects_revoked_and_bad_proof(tmp_path, monkeypatch
     tree = MerkleTree([canonical_json_dumps(envelope.model_dump())])
 
     class _FakeResp:
-        def __init__(self, body: dict):
+        def __init__(self, body: dict[str, Any]) -> None:
             self._buf = json.dumps(body).encode("utf-8")
 
-        def read(self):
+        def read(self) -> bytes:
             return self._buf
 
-        def __enter__(self):
+        def __enter__(self) -> _FakeResp:
             return self
 
-        def __exit__(self, *args):
+        def __exit__(self, *args: object) -> bool:
             return False
 
-    base_record = {
+    def _make_urlopen(body: dict[str, Any]) -> Callable[..., _FakeResp]:
+        def _urlopen(req: object, timeout: float = 5) -> _FakeResp:
+            return _FakeResp(body)
+
+        return _urlopen
+
+    signed_tree_head: dict[str, Any] = {
+        "tree_size": 1,
+        "root_hash": tree.root_hex(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "signature": "sig",
+    }
+    base_record: dict[str, Any] = {
         "envelope": envelope.model_dump(),
         "leaf_index": 0,
         "tree_size": 1,
@@ -122,24 +139,19 @@ def test_standalone_verifier_rejects_revoked_and_bad_proof(tmp_path, monkeypatch
         "is_revoked": False,
         "revocation_reason": None,
         "inclusion_proof": {"leaf_index": 0, "tree_size": 1, "audit_path": tree.get_inclusion_proof(0)},
-        "signed_tree_head": {
-            "tree_size": 1,
-            "root_hash": tree.root_hex(),
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "signature": "sig",
-        },
+        "signed_tree_head": signed_tree_head,
     }
 
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=5: _FakeResp(base_record))
+    monkeypatch.setattr(urllib.request, "urlopen", _make_urlopen(base_record))
     assert verify_certificate(str(cert_file), registry_url="http://registry.local") is True
 
-    revoked_record = {**base_record, "is_revoked": True, "revocation_reason": "compromised"}
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=5: _FakeResp(revoked_record))
+    revoked_record: dict[str, Any] = {**base_record, "is_revoked": True, "revocation_reason": "compromised"}
+    monkeypatch.setattr(urllib.request, "urlopen", _make_urlopen(revoked_record))
     assert verify_certificate(str(cert_file), registry_url="http://registry.local") is False
 
-    bad_proof_record = {
+    bad_proof_record: dict[str, Any] = {
         **base_record,
-        "signed_tree_head": {**base_record["signed_tree_head"], "root_hash": "ff" * 32},
+        "signed_tree_head": {**signed_tree_head, "root_hash": "ff" * 32},
     }
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=5: _FakeResp(bad_proof_record))
+    monkeypatch.setattr(urllib.request, "urlopen", _make_urlopen(bad_proof_record))
     assert verify_certificate(str(cert_file), registry_url="http://registry.local") is False

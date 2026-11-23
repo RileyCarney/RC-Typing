@@ -10,8 +10,17 @@ from rctyping_app.db.models import Base, UserModel, UserSettingsModel
 
 DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001"
 
-_engine = None
-_SessionFactory = None
+_engine: Engine | None = None
+_SessionFactory: sessionmaker[Session] | None = None
+
+
+def reset_db() -> None:
+    """Dispose and clear cached engine/session factory."""
+    global _engine, _SessionFactory
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _SessionFactory = None
 
 
 def get_engine(db_path: Path | None = None):

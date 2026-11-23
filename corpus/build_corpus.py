@@ -1,6 +1,7 @@
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 # Curated and verified typing corpus passages covering general prose, technical, formal, conversational,
 # reading comprehension, and multi-language programming syntax.
@@ -12388,7 +12389,7 @@ def build_corpus():
     out_dir = base_dir / "data"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    grouped = {}
+    grouped: dict[str, list[dict[str, Any]]] = {}
     for p in PASSAGES:
         # Normalize text line endings to \n
         text_norm = p["text"].replace("\r\n", "\n").replace("\r", "\n")

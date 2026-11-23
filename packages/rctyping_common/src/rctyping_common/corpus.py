@@ -6,7 +6,7 @@ import hashlib
 import json
 import random
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -36,6 +36,11 @@ class CorpusRepository:
             key = (p.category, p.language)
             self._by_cat_lang.setdefault(key, []).append(p)
 
+    @property
+    def passages(self) -> List[Passage]:
+        """Return a copy of all loaded corpus passages."""
+        return list(self._passages)
+
     @classmethod
     def load_from_dir(cls, corpus_dir: Path | str) -> CorpusRepository:
         path = Path(corpus_dir)
@@ -46,14 +51,15 @@ class CorpusRepository:
                 passages = [Passage(**item) for item in data]
                 return cls(passages)
 
-        passages = []
+        passages: List[Passage] = []
         for json_file in path.glob("*.json"):
             if json_file.name == "index.json":
                 continue
             with open(json_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, list):
-                    passages.extend([Passage(**item) for item in data])
+                    raw_items = cast(List[dict[str, Any]], data)
+                    passages.extend([Passage(**item) for item in raw_items])
         return cls(passages)
 
     def get_by_id(self, passage_id: str) -> Optional[Passage]:

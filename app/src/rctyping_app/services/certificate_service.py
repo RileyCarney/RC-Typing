@@ -68,7 +68,7 @@ class CertificateService:
             raise ValueError(f"Passage '{session.passage_id}' missing from corpus")
 
         # 1. Compute metrics and replay
-        metrics, reconstructed_text = compute_metrics(
+        metrics, _ = compute_metrics(
             passage.text,
             events,
             server_duration_ms,
@@ -76,7 +76,7 @@ class CertificateService:
         )
 
         # 2. Evaluate anti-cheat heuristics
-        integrity, flags = evaluate_keystroke_integrity(
+        integrity, _ = evaluate_keystroke_integrity(
             events,
             server_duration_ms,
             min_human_iki_ms=settings.min_human_iki_ms,

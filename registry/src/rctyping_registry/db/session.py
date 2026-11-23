@@ -2,13 +2,23 @@
 
 from pathlib import Path
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from rctyping_registry.config import registry_settings
 from rctyping_registry.db.models import RegistryBase
 
-_engine = None
-_SessionFactory = None
+_engine: Engine | None = None
+_SessionFactory: sessionmaker[Session] | None = None
+
+
+def reset_registry_db() -> None:
+    """Dispose and clear cached engine/session factory."""
+    global _engine, _SessionFactory
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _SessionFactory = None
 
 
 def get_registry_engine(db_path: Path | None = None):

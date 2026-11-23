@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from typing import Any
+from typing import Any, cast
 
 
 def _normalize_item(item: Any) -> Any:
@@ -32,10 +32,12 @@ def _normalize_item(item: Any) -> Any:
     if isinstance(item, str):
         return item
     if isinstance(item, (list, tuple)):
-        return [_normalize_item(x) for x in item]
+        seq = cast(list[Any] | tuple[Any, ...], item)
+        return [_normalize_item(x) for x in seq]
     if isinstance(item, dict):
         # Sort keys lexicographically
-        return {str(k): _normalize_item(v) for k, v in sorted(item.items(), key=lambda kv: str(kv[0]))}
+        mapping = cast(dict[Any, Any], item)
+        return {str(k): _normalize_item(v) for k, v in sorted(mapping.items(), key=lambda kv: str(kv[0]))}
     # For objects with model_dump or to_dict
     if hasattr(item, "model_dump"):
         return _normalize_item(item.model_dump(mode="json"))

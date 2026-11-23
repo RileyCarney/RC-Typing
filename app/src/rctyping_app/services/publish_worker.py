@@ -6,9 +6,8 @@ import asyncio
 import datetime
 import hashlib
 import logging
-from typing import Optional
+from typing import Any, Optional
 import httpx
-from sqlalchemy.orm import Session
 
 from rctyping_app.core.keystore import KeyStore
 from rctyping_app.db.models import CertificateModel, PublishJobModel, UserSettingsModel
@@ -21,12 +20,17 @@ logger = logging.getLogger("rctyping.publish_worker")
 
 class PublishWorker:
 
-    def __init__(self, keystore: KeyStore, poll_interval_sec: float = 3.0) -> None:
+    def __init__(
+        self,
+        keystore: KeyStore,
+        poll_interval_sec: float = 3.0,
+        client: Optional[httpx.AsyncClient] = None,
+    ) -> None:
         self.keystore = keystore
         self.poll_interval_sec = poll_interval_sec
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._client: Optional[httpx.AsyncClient] = None
+        self._task: Optional[asyncio.Task[None]] = None
+        self._client: Optional[httpx.AsyncClient] = client
         self._registered_registries: set[str] = set()
 
     def start(self) -> None:
@@ -40,6 +44,10 @@ class PublishWorker:
         if self._task:
             self._task.cancel()
             logger.info("Publish worker stopped")
+
+    async def close(self) -> None:
+        """Close the underlying HTTP client if open."""
+        await self._close_client()
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -66,7 +74,7 @@ class PublishWorker:
 
     async def process_pending_jobs(self) -> None:
         now = datetime.datetime.now(datetime.timezone.utc)
-        pending_items: list[tuple[str, str, dict, str]] = []
+        pending_items: list[tuple[str, str, dict[str, Any], str]] = []
 
         with get_app_session() as db:
             jobs = (
@@ -164,7 +172,7 @@ class PublishWorker:
         reg_resp.raise_for_status()
         self._registered_registries.add(normalized_url)
 
-    async def _publish_to_registry(self, registry_url: str, envelope_dict: dict) -> dict:
+    async def _publish_to_registry(self, registry_url: str, envelope_dict: dict[str, Any]) -> dict[str, Any]:
         normalized_url = registry_url.rstrip("/")
         client = await self._get_client()
         await self._ensure_issuer_registered(client, normalized_url)

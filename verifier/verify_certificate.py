@@ -13,7 +13,7 @@ import hashlib
 import json
 import math
 import sys
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 import urllib.request
 import urllib.error
 
@@ -34,9 +34,11 @@ def _normalize_item(item: Any) -> Any:
             raise ValueError(f"Non-finite float not allowed: {item}")
         return int(item) if item.is_integer() else round(item, 10)
     if isinstance(item, (list, tuple)):
-        return [_normalize_item(x) for x in item]
+        seq = cast(list[Any] | tuple[Any, ...], item)
+        return [_normalize_item(x) for x in seq]
     if isinstance(item, dict):
-        return {str(k): _normalize_item(v) for k, v in sorted(item.items(), key=lambda kv: str(kv[0]))}
+        mapping = cast(dict[Any, Any], item)
+        return {str(k): _normalize_item(v) for k, v in sorted(mapping.items(), key=lambda kv: str(kv[0]))}
     raise TypeError(f"Unsupported type: {type(item)}")
 
 

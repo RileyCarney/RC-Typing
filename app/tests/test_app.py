@@ -1,4 +1,9 @@
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, cast
 import uuid
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,25 +14,27 @@ from rctyping_common.certificate import verify_certificate_envelope
 from rctyping_common.models import CertificateEnvelope, KeystrokeEvent
 
 
+@contextmanager
+def _test_client() -> Generator[httpx.Client, None, None]:
+    with TestClient(app) as client:
+        yield cast(httpx.Client, client)
+
+
 @pytest.fixture(autouse=True)
-def isolated_app_db(tmp_path, monkeypatch):
+def isolated_app_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     import rctyping_app.db.session as app_db_session
     from rctyping_app.config import settings
 
-    if app_db_session._engine is not None:
-        app_db_session._engine.dispose()
-    monkeypatch.setattr(app_db_session, "_engine", None)
-    monkeypatch.setattr(app_db_session, "_SessionFactory", None)
+    app_db_session.reset_db()
     monkeypatch.setattr(settings, "data_dir", tmp_path / "data")
     yield
-    if app_db_session._engine is not None:
-        app_db_session._engine.dispose()
+    app_db_session.reset_db()
 
 
 def test_keystroke_replay_and_metrics():
     target = "def hello():\n    return 42"
     # Generate realistic keystrokes matching target
-    events = []
+    events: list[KeystrokeEvent] = []
     t = 0
     for char in target:
         if char == "\n":
@@ -46,7 +53,7 @@ def test_keystroke_replay_and_metrics():
 
 def test_compute_metrics_with_tab():
     target = "def foo():\n    return 42"
-    events = []
+    events: list[KeystrokeEvent] = []
     t = 0
     for ch in "def foo():\n":
         key = "Enter" if ch == "\n" else ch
@@ -68,7 +75,7 @@ def test_compute_metrics_with_tab():
 
 def test_tab_followed_by_backspaces_replay_and_metrics():
     target = "def foo():\n    return 42"
-    events = []
+    events: list[KeystrokeEvent] = []
     t = 0
     for ch in "def foo():\n":
         key = "Enter" if ch == "\n" else ch
@@ -140,7 +147,7 @@ def test_anticheat_heuristics():
 
 
 def test_api_session_lifecycle_and_certificate():
-    with TestClient(app) as client:
+    with _test_client() as client:
         # 1. List categories
         resp = client.get("/api/categories")
         assert resp.status_code == 200
@@ -157,7 +164,7 @@ def test_api_session_lifecycle_and_certificate():
         target_text = passage["text"]
 
         # 3. Simulate human-like keystrokes
-        events = []
+        events: list[dict[str, Any]] = []
         t = 0
         import random
         for ch in target_text:
@@ -214,7 +221,7 @@ def test_session_start_resets_idle_clock_for_clean_integrity():
     from rctyping_app.db.models import SessionModel
     from rctyping_app.db.session import get_app_session
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         resp = client.post("/api/sessions", json={"category": "code", "language": "python"})
         assert resp.status_code == 200
         sess_data = resp.json()
@@ -234,7 +241,7 @@ def test_session_start_resets_idle_clock_for_clean_integrity():
 
         # Type a prefix with realistic human jitter (~2s total, well within skew allowance)
         sample = target_text[:30]
-        events = []
+        events: list[dict[str, Any]] = []
         t = 0
         for idx, ch in enumerate(sample):
             key = "Enter" if ch == "\n" else ch
@@ -256,7 +263,7 @@ def test_session_start_resets_idle_clock_for_clean_integrity():
 
 
 def test_favicon_served():
-    with TestClient(app) as client:
+    with _test_client() as client:
         resp = client.get("/favicon.ico")
         assert resp.status_code == 200
         assert "svg" in resp.headers.get("content-type", "")
@@ -272,7 +279,7 @@ def test_typing_thoughts_storage_encryption_folders_and_zip_export():
     from rctyping_app.db.models import ThoughtModel
     from rctyping_app.db.session import get_app_session
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         # Verify UI serves Typing Thoughts tab
         html_resp = client.get("/")
         assert html_resp.status_code == 200
@@ -422,7 +429,7 @@ def test_stats_exclude_flagged_and_publish_retry_resets_backoff():
     from rctyping_app.db.models import PublishJobModel, SessionModel
     from rctyping_app.db.session import get_app_session
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         # 1. Finish a flagged session (<10 untrusted events)
         sess1 = client.post("/api/sessions", json={"category": "prose"}).json()
         flagged_events = [
@@ -443,7 +450,7 @@ def test_stats_exclude_flagged_and_publish_retry_resets_backoff():
         # 2. Finish a clean session
         sess2 = client.post("/api/sessions", json={"category": "prose"}).json()
         clean_text = sess2["passage"]["text"]
-        clean_events = []
+        clean_events: list[dict[str, Any]] = []
         t = 0
         for idx, ch in enumerate(clean_text):
             key = "Enter" if ch == "\n" else ch
@@ -493,14 +500,16 @@ def test_stats_exclude_flagged_and_publish_retry_resets_backoff():
             assert next_at >= before_retry - datetime.timedelta(seconds=2)
 
 
-def test_certificate_service_uses_configured_anticheat_settings(monkeypatch):
+def test_certificate_service_uses_configured_anticheat_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from rctyping_app.config import settings
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         monkeypatch.setattr(settings, "min_human_iki_ms", 200.0)
         sess = client.post("/api/sessions", json={"category": "prose"}).json()
         sample = sess["passage"]["text"][:20]
-        events = []
+        events: list[dict[str, Any]] = []
         t = 0
         for idx, ch in enumerate(sample):
             events.append({"t_ms": t, "key": ch, "type": "keydown", "is_trusted": True})
@@ -516,9 +525,8 @@ def test_certificate_service_uses_configured_anticheat_settings(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_publish_worker_caches_registration_and_releases_db(tmp_path):
+async def test_publish_worker_caches_registration_and_releases_db(tmp_path: Path) -> None:
     import json
-    import httpx
     from rctyping_app.core.keystore import KeyStore
     from rctyping_app.db.models import CertificateModel, PublishJobModel, SessionModel
     from rctyping_app.db.session import DEFAULT_USER_ID, get_app_session, init_db
@@ -528,7 +536,7 @@ async def test_publish_worker_caches_registration_and_releases_db(tmp_path):
     ks = KeyStore(keys_dir=tmp_path / "data" / "keys")
 
     with get_app_session() as db:
-        for i in range(2):
+        for _ in range(2):
             sid = str(uuid.uuid4())
             cid = str(uuid.uuid4())
             db.add(
@@ -567,12 +575,14 @@ async def test_publish_worker_caches_registration_and_releases_db(tmp_path):
             return httpx.Response(200, json={"cert_id": body["payload"]["cert_id"]})
         return httpx.Response(404)
 
-    worker = PublishWorker(keystore=ks)
-    worker._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    worker = PublishWorker(
+        keystore=ks,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
     try:
         await worker.process_pending_jobs()
     finally:
-        await worker._close_client()
+        await worker.close()
 
     # Registration lookup ran only once for both pending certificates
     get_issuer_calls = [r for r in seen_requests if r[0] == "GET"]
@@ -584,11 +594,12 @@ async def test_publish_worker_caches_registration_and_releases_db(tmp_path):
         assert db.query(PublishJobModel).filter(PublishJobModel.state == "completed").count() == 2
 
 
-def test_cli_verify_rejects_revoked_registry_certificate(tmp_path, monkeypatch):
+def test_cli_verify_rejects_revoked_registry_certificate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import argparse
     import datetime
     import json
-    import httpx
     from rctyping_app.cli import cmd_verify
     from rctyping_common.canonical import canonical_json_dumps
     from rctyping_common.certificate import calculate_key_id, generate_keypair, sign_certificate
@@ -632,7 +643,7 @@ def test_cli_verify_rejects_revoked_registry_certificate(tmp_path, monkeypatch):
     class _MockResp:
         status_code = 200
 
-        def json(self):
+        def json(self) -> dict[str, Any]:
             return {
                 "envelope": envelope.model_dump(),
                 "leaf_index": 0,
@@ -649,7 +660,10 @@ def test_cli_verify_rejects_revoked_registry_certificate(tmp_path, monkeypatch):
                 },
             }
 
-    monkeypatch.setattr(httpx, "get", lambda *a, **kw: _MockResp())
+    def _mock_get(*args: Any, **kwargs: Any) -> _MockResp:
+        return _MockResp()
+
+    monkeypatch.setattr(httpx, "get", _mock_get)
     args = argparse.Namespace(certificate_file=str(cert_path), pubkey=None, registry="http://registry.local")
     with pytest.raises(SystemExit) as exc:
         cmd_verify(args)
@@ -677,7 +691,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
             self.footer_links: list[str] = []
             self.settings_text_parts: list[str] = []
 
-        def handle_starttag(self, tag, attrs):
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
             attr_map = dict(attrs)
             if tag == "header":
                 self.in_header = True
@@ -700,7 +714,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
                 if href is not None:
                     self.footer_links.append(href)
 
-        def handle_endtag(self, tag):
+        def handle_endtag(self, tag: str) -> None:
             if tag == "button" and self.in_button:
                 self.in_button = False
                 self.nav_buttons.append(" ".join("".join(self.current_btn_parts).split()))
@@ -715,7 +729,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
             elif tag == "footer" and self.in_footer:
                 self.in_footer = False
 
-        def handle_data(self, data):
+        def handle_data(self, data: str) -> None:
             if self.in_header:
                 self.header_text_parts.append(data)
             if self.in_button:
@@ -725,7 +739,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
             if self.in_footer:
                 self.footer_text_parts.append(data)
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         resp = client.get("/")
         assert resp.status_code == 200
         html = resp.text
@@ -781,7 +795,7 @@ def test_live_test_stat_values_use_pixel_font_exclusively():
             self.in_label = False
             self.current_label: list[str] = []
 
-        def handle_starttag(self, tag, attrs):
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
             attr_map = dict(attrs)
             class_attr = attr_map.get("class") or ""
             classes = class_attr.split()
@@ -798,7 +812,7 @@ def test_live_test_stat_values_use_pixel_font_exclusively():
                 self.in_label = True
                 self.current_label = []
 
-        def handle_endtag(self, tag):
+        def handle_endtag(self, tag: str) -> None:
             if self.in_value and tag == "div":
                 self.in_value = False
             elif self.in_label and tag == "div":
@@ -808,11 +822,11 @@ def test_live_test_stat_values_use_pixel_font_exclusively():
             elif self.card_stack and tag == "div" and not self.in_value and not self.in_label:
                 self.cards.append(self.card_stack.pop())
 
-        def handle_data(self, data):
+        def handle_data(self, data: str) -> None:
             if self.in_label:
                 self.current_label.append(data)
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         html_resp = client.get("/")
         assert html_resp.status_code == 200
         html = html_resp.text
@@ -875,7 +889,7 @@ def test_migrate_legacy_thoughts_encrypted_markdown_column():
             """
         )
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         resp = client.post(
             "/api/thoughts",
             json={"content": "test", "duration_ms": 472, "filename": "test.md"},
@@ -929,11 +943,11 @@ def test_end_to_end_over_600_wpm_and_limitless_top_wpm_stats():
     from rctyping_app.db.models import SessionModel
     from rctyping_app.db.session import get_app_session
 
-    with TestClient(app) as client:
+    with _test_client() as client:
         # Run 1: >600 WPM (~800+ WPM with natural jitter)
         sess1 = client.post("/api/sessions", json={"category": "prose"}).json()
         text1 = sess1["passage"]["text"]
-        events1 = []
+        events1: list[dict[str, Any]] = []
         t1 = 0
         for idx, ch in enumerate(text1):
             key = "Enter" if ch == "\n" else ch
@@ -964,7 +978,7 @@ def test_end_to_end_over_600_wpm_and_limitless_top_wpm_stats():
         # Run 2: Limitless ultra-high WPM (~4000+ WPM with relative jitter)
         sess2 = client.post("/api/sessions", json={"category": "prose"}).json()
         text2 = sess2["passage"]["text"]
-        events2 = []
+        events2: list[dict[str, Any]] = []
         t2 = 0
         for idx, ch in enumerate(text2):
             key = "Enter" if ch == "\n" else ch
@@ -995,7 +1009,7 @@ def test_end_to_end_over_600_wpm_and_limitless_top_wpm_stats():
 
 
 def test_typing_thoughts_uncapped_wpm():
-    with TestClient(app) as client:
+    with _test_client() as client:
         # 50 chars in 10ms = (50 / 5) / (10 / 60000) = 60,000.0 WPM (no 0.001 min / 60ms cap)
         resp = client.post(
             "/api/thoughts",

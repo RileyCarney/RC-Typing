@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 import pytest
-from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from rctyping_common.canonical import canonical_json_dumps, canonical_json_hash
 from rctyping_common.certificate import (
@@ -20,7 +19,6 @@ from rctyping_common.certificate import (
 from rctyping_common.corpus import CorpusRepository, Passage
 from rctyping_common.merkle import (
     MerkleTree,
-    leaf_hash,
     verify_consistency_proof,
     verify_inclusion_proof,
 )
@@ -148,7 +146,7 @@ def test_sign_and_verify_certificate():
     assert verify_certificate_envelope(tampered_envelope2) is False
 
     # Tamper test 3: Signature from different key
-    other_priv, other_pub = generate_keypair()
+    _, other_pub = generate_keypair()
     assert verify_certificate_envelope(envelope, expected_public_key=other_pub) is False
 
 
@@ -206,7 +204,7 @@ def test_merkle_tree_and_proofs():
     assert verify_inclusion_proof(leaves[0], 0, 10, ["not-hex"], root_hex) is False
 
 
-def test_corpus_repository(tmp_path):
+def test_corpus_repository(tmp_path: Path) -> None:
     passages = [
         Passage(
             id="p1",
@@ -246,12 +244,13 @@ def test_production_corpus_integrity():
     corpus_dir = Path(__file__).resolve().parents[3] / "corpus" / "data"
     repo = CorpusRepository.load_from_dir(corpus_dir)
 
-    assert len(repo._passages) == 1125
-    assert len({p.id for p in repo._passages}) == 1125
-    assert len({p.text for p in repo._passages}) == 1125
-    assert len({(p.category, p.language, p.title) for p in repo._passages}) == 1125
+    passages = repo.passages
+    assert len(passages) == 1125
+    assert len({p.id for p in passages}) == 1125
+    assert len({p.text for p in passages}) == 1125
+    assert len({(p.category, p.language, p.title) for p in passages}) == 1125
 
-    for p in repo._passages:
+    for p in passages:
         assert repo.verify_passage_text(p.id, p.text) is True
         assert all(c == "\n" or (32 <= ord(c) <= 126) for c in p.text), (
             f"Non-ASCII or disallowed control char in passage {p.id}"

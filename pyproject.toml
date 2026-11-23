@@ -31,3 +31,9 @@ rctyping-registry = { workspace = true }
 [tool.pytest.ini_options]
 testpaths = ["tests", "packages/rctyping_common/tests", "app/tests", "registry/tests"]
 pythonpath = [".", "packages/rctyping_common/src", "app/src", "registry/src"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+include = ["app", "registry", "packages", "tests", "verifier", "corpus"]
+extraPaths = ["."]
