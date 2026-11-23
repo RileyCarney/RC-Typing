@@ -759,6 +759,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
         assert "notebook-margin-line" in html
 
         settings_text = " ".join("".join(parser.settings_text_parts).split())
+        assert settings_text.index("Typing Performance History") < settings_text.index("Application Settings")
         for info_item in [
             "Application Information",
             "rc-typing",
@@ -1018,5 +1019,23 @@ def test_typing_thoughts_uncapped_wpm():
         assert resp.status_code == 200
         data = resp.json()
         assert data["wpm"] == 60000.0
+
+
+def test_file_explorer_labels():
+    with _test_client() as client:
+        html = client.get("/").text
+        assert 'id="thought-active-folder-label">./</div>' in html
+        assert "<h2>File Explorer</h2>" in html
+        assert "Brain Explorer" not in html
+        assert 'id="brain-current-path-heading">All Thoughts</span>' in html
+        assert "Brain / (All Thoughts)" not in html
+
+        js = client.get("/static/app.js").text
+        assert "activeFolder ? `./${activeFolder.path}` : './'" in js
+        assert 'class="tree-folder-name">/ (Root)</span>' in js
+        assert "rootOpt.innerText = '/ (Root)';" in js
+        assert "activeFolder ? `/${activeFolder.path}` : 'All Thoughts'" in js
+        assert "Brain /" not in js
+
 
 

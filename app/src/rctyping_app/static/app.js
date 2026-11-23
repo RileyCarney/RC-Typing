@@ -786,14 +786,14 @@ function renderBrainExplorer() {
 
   const activeFolder = brainState.folders.find(f => f.id === activeFolderId);
   if (activeLabel) {
-    activeLabel.innerText = activeFolder ? `Brain / ${activeFolder.path}` : 'Brain /';
+    activeLabel.innerText = activeFolder ? `./${activeFolder.path}` : './';
   }
 
   // Root node
   const rootRow = document.createElement('div');
   rootRow.className = `tree-folder-row${activeFolderId === null ? ' active' : ''}`;
   rootRow.dataset.folderId = 'root';
-  rootRow.innerHTML = `<span class="tree-folder-label"><span>&#128193;</span><span class="tree-folder-name">Brain / (Root)</span></span>`;
+  rootRow.innerHTML = `<span class="tree-folder-label"><span>&#128193;</span><span class="tree-folder-name">/ (Root)</span></span>`;
   rootRow.addEventListener('click', () => {
     activeFolderId = null;
     renderBrainExplorer();
@@ -889,7 +889,7 @@ function renderBrainThoughts() {
     : brainState.thoughts.filter(t => t.folder_id === activeFolderId);
 
   if (headingEl) {
-    headingEl.innerText = activeFolder ? `Brain / ${activeFolder.path}` : 'Brain / (All Thoughts)';
+    headingEl.innerText = activeFolder ? `/${activeFolder.path}` : 'All Thoughts';
   }
   if (countEl) {
     countEl.innerText = `${visibleThoughts.length} thought${visibleThoughts.length === 1 ? '' : 's'}`;
@@ -944,7 +944,7 @@ function renderBrainThoughts() {
     moveSelect.className = 'thought-move-select';
     const rootOpt = document.createElement('option');
     rootOpt.value = '';
-    rootOpt.innerText = 'Brain / (Root)';
+    rootOpt.innerText = '/ (Root)';
     if (!t.folder_id) rootOpt.selected = true;
     moveSelect.appendChild(rootOpt);
 

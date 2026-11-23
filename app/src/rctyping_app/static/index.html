@@ -140,7 +140,7 @@
               <div class="stat-label">Characters</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value thought-folder-stat" id="thought-active-folder-label">Brain /</div>
+              <div class="stat-value thought-folder-stat" id="thought-active-folder-label">./</div>
               <div class="stat-label">Target Folder</div>
             </div>
           </div>
@@ -164,7 +164,7 @@
           <div class="passage-card" id="brain-section">
             <div class="brain-toolbar">
               <div>
-                <h2>Brain Explorer</h2>
+                <h2>File Explorer</h2>
                 <p class="muted-note" style="margin-top: 0.2rem;">
                   Locally encrypted <code>.md</code> thoughts. Drag thoughts onto any folder in the tree to organize.
                 </p>
@@ -184,7 +184,7 @@
 
               <div class="brain-main">
                 <div class="brain-main-header">
-                  <span id="brain-current-path-heading">Brain / (All Thoughts)</span>
+                  <span id="brain-current-path-heading">All Thoughts</span>
                   <span id="brain-thought-count" class="muted-note">0 thoughts</span>
                 </div>
                 <div id="brain-thoughts-list" class="thoughts-list"></div>
@@ -224,6 +224,16 @@
         <!-- TAB 4: SETTINGS -->
         <section id="tab-settings" class="tab-content">
           <div class="passage-card" style="margin-bottom: 1.5rem;">
+            <h2>Typing Performance History</h2>
+            <p class="muted-note" style="margin: 0.5rem 0 1.25rem 0; font-size: 0.92rem;">
+              Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
+            </p>
+            <div id="stats-container">
+              <p class="muted-note">Loading stats...</p>
+            </div>
+          </div>
+
+          <div class="passage-card" style="margin-bottom: 1.5rem;">
             <h2>Application Settings</h2>
             <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 600px;">
               <div>
@@ -253,16 +263,6 @@
                 <button type="button" id="save-settings-btn" class="btn">Save Settings</button>
                 <span id="settings-status" style="margin-left: 1rem; font-size: 0.9rem; color: var(--correct);"></span>
               </div>
-            </div>
-          </div>
-
-          <div class="passage-card" style="margin-bottom: 1.5rem;">
-            <h2>Typing Performance History</h2>
-            <p class="muted-note" style="margin: 0.5rem 0 1.25rem 0; font-size: 0.92rem;">
-              Speed varies dramatically by category of thought. Typing symbols and strict indentation in code requires different motor-cognitive patterns than prose.
-            </p>
-            <div id="stats-container">
-              <p class="muted-note">Loading stats...</p>
             </div>
           </div>
 
