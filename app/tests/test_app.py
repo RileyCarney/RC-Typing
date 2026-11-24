@@ -690,6 +690,9 @@ def test_notebook_ui_menu_settings_info_and_footer():
             self.footer_text_parts: list[str] = []
             self.footer_links: list[str] = []
             self.settings_text_parts: list[str] = []
+            self.in_thoughts = False
+            self.thoughts_depth = 0
+            self.thoughts_text_parts: list[str] = []
 
         def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
             attr_map = dict(attrs)
@@ -702,6 +705,11 @@ def test_notebook_ui_menu_settings_info_and_footer():
                 self.current_btn_parts = []
             elif tag == "path" and self.in_button and "pencil-circle-path" in (attr_map.get("class") or ""):
                 self.nav_button_circle_paths += 1
+            elif tag == "section" and attr_map.get("id") == "tab-thoughts":
+                self.in_thoughts = True
+                self.thoughts_depth = 1
+            elif self.in_thoughts and tag == "section":
+                self.thoughts_depth += 1
             elif tag == "section" and attr_map.get("id") == "tab-settings":
                 self.in_settings = True
                 self.settings_depth = 1
@@ -722,6 +730,10 @@ def test_notebook_ui_menu_settings_info_and_footer():
                 self.in_nav = False
             elif tag == "header" and self.in_header:
                 self.in_header = False
+            elif tag == "section" and self.in_thoughts:
+                self.thoughts_depth -= 1
+                if self.thoughts_depth == 0:
+                    self.in_thoughts = False
             elif tag == "section" and self.in_settings:
                 self.settings_depth -= 1
                 if self.settings_depth == 0:
@@ -734,6 +746,8 @@ def test_notebook_ui_menu_settings_info_and_footer():
                 self.header_text_parts.append(data)
             if self.in_button:
                 self.current_btn_parts.append(data)
+            if self.in_thoughts:
+                self.thoughts_text_parts.append(data)
             if self.in_settings:
                 self.settings_text_parts.append(data)
             if self.in_footer:
@@ -758,6 +772,9 @@ def test_notebook_ui_menu_settings_info_and_footer():
         assert "notebook-holes" in html
         assert "notebook-margin-line" in html
 
+        thoughts_text = " ".join("".join(parser.thoughts_text_parts).split())
+        assert "AES-256-GCM Local Encrypted" not in thoughts_text
+
         settings_text = " ".join("".join(parser.settings_text_parts).split())
         assert settings_text.index("Typing Performance History") < settings_text.index("Application Settings")
         for info_item in [
@@ -767,6 +784,7 @@ def test_notebook_ui_menu_settings_info_and_footer():
             "RFC 8785 Canonical JSON",
             "Ed25519",
             "RFC 6962 Transparency Log",
+            "AES-256-GCM Local Encrypted",
         ]:
             assert info_item in settings_text
 
