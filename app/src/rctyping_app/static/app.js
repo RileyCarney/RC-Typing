@@ -20,7 +20,7 @@ function escapeHtml(val) {
 }
 
 // DOM Elements
-const categorySelectedLabel = document.getElementById('category-selected-label');
+const categorySidebar = document.getElementById('category-sidebar');
 const categoryButtons = Array.from(document.querySelectorAll('#category-list .category-item'));
 const languageSubmenu = document.getElementById('code-language-submenu');
 const languageButtons = Array.from(document.querySelectorAll('#code-language-submenu .submenu-item'));
@@ -37,18 +37,12 @@ let selectedCategory = 'code';
 let selectedLanguage = 'python';
 
 function syncCategoryMenuUI() {
-  let activeCategoryLabel = 'Programming Code';
-  let activeLanguageLabel = 'Python';
-
   categoryButtons.forEach((btn) => {
     const isSelected = btn.dataset.category === selectedCategory;
     btn.classList.toggle('active', isSelected);
     btn.setAttribute('aria-pressed', String(isSelected));
     if (btn.dataset.category === 'code') {
       btn.setAttribute('aria-expanded', String(isSelected));
-    }
-    if (isSelected) {
-      activeCategoryLabel = btn.dataset.label || btn.textContent.trim();
     }
   });
 
@@ -60,16 +54,7 @@ function syncCategoryMenuUI() {
     const isSelected = btn.dataset.language === selectedLanguage;
     btn.classList.toggle('active', isSelected);
     btn.setAttribute('aria-pressed', String(isSelected));
-    if (isSelected) {
-      activeLanguageLabel = btn.dataset.label || btn.textContent.trim();
-    }
   });
-
-  if (categorySelectedLabel) {
-    categorySelectedLabel.textContent = selectedCategory === 'code'
-      ? `${activeCategoryLabel} · ${activeLanguageLabel}`
-      : activeCategoryLabel;
-  }
 }
 
 // Modal Elements
@@ -145,6 +130,11 @@ function setupTabs() {
       btn.setAttribute('aria-current', 'page');
       const tabId = `tab-${btn.dataset.tab}`;
       document.getElementById(tabId).classList.add('active');
+
+      const isTest = btn.dataset.tab === 'test';
+      if (categorySidebar) {
+        categorySidebar.hidden = !isTest;
+      }
 
       const isThoughts = btn.dataset.tab === 'thoughts';
       const thoughtsDock = document.getElementById('thoughts-stats-dock');

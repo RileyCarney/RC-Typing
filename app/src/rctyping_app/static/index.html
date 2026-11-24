@@ -22,6 +22,62 @@
     </defs>
   </svg>
 
+  <aside id="category-sidebar" class="category-sidebar" aria-labelledby="category-sidebar-title">
+    <h2 id="category-sidebar-title" class="category-sidebar-title">Category</h2>
+
+    <ul id="category-list" class="category-list" aria-label="Category">
+      <li class="category-list-item has-submenu">
+        <button
+          type="button"
+          class="category-item active"
+          data-category="code"
+          data-label="Programming Code"
+          aria-pressed="true"
+          aria-expanded="true"
+          aria-controls="code-language-submenu"
+        >
+          <span class="category-item-label">Programming Code</span>
+          <span class="submenu-chevron" aria-hidden="true">&#9662;</span>
+        </button>
+
+        <ul id="code-language-submenu" class="language-submenu" aria-label="Programming Language">
+          <li><button type="button" class="submenu-item active" data-language="python" data-label="Python" aria-pressed="true">Python</button></li>
+          <li><button type="button" class="submenu-item" data-language="powershell" data-label="PowerShell" aria-pressed="false">PowerShell</button></li>
+          <li><button type="button" class="submenu-item" data-language="cpp" data-label="C++" aria-pressed="false">C++</button></li>
+          <li><button type="button" class="submenu-item" data-language="csharp" data-label="C#" aria-pressed="false">C#</button></li>
+          <li><button type="button" class="submenu-item" data-language="javascript" data-label="JavaScript" aria-pressed="false">JavaScript</button></li>
+          <li><button type="button" class="submenu-item" data-language="typescript" data-label="TypeScript" aria-pressed="false">TypeScript</button></li>
+          <li><button type="button" class="submenu-item" data-language="sql" data-label="SQL" aria-pressed="false">SQL</button></li>
+        </ul>
+      </li>
+      <li class="category-list-item">
+        <button type="button" class="category-item" data-category="prose" data-label="Prose &amp; Literature" aria-pressed="false">
+          <span class="category-item-label">Prose &amp; Literature</span>
+        </button>
+      </li>
+      <li class="category-list-item">
+        <button type="button" class="category-item" data-category="reading" data-label="Reading &amp; Encyclopedic" aria-pressed="false">
+          <span class="category-item-label">Reading &amp; Encyclopedic</span>
+        </button>
+      </li>
+      <li class="category-list-item">
+        <button type="button" class="category-item" data-category="technical" data-label="Technical &amp; Scientific" aria-pressed="false">
+          <span class="category-item-label">Technical &amp; Scientific</span>
+        </button>
+      </li>
+      <li class="category-list-item">
+        <button type="button" class="category-item" data-category="formal" data-label="Formal &amp; Legal" aria-pressed="false">
+          <span class="category-item-label">Formal &amp; Legal</span>
+        </button>
+      </li>
+      <li class="category-list-item">
+        <button type="button" class="category-item" data-category="conversational" data-label="Conversational Dialogue" aria-pressed="false">
+          <span class="category-item-label">Conversational Dialogue</span>
+        </button>
+      </li>
+    </ul>
+  </aside>
+
   <div class="notebook-desk">
     <div class="notebook-sheet">
       <div class="notebook-holes" aria-hidden="true"></div>
@@ -67,69 +123,6 @@
         <!-- TAB 1: TYPING TEST -->
         <section id="tab-test" class="tab-content active">
           <div class="test-layout">
-            <aside class="category-sidebar" aria-labelledby="category-sidebar-title">
-              <h2 id="category-sidebar-title" class="category-sidebar-title">Category of thought</h2>
-
-              <details id="category-dropdown" class="category-dropdown" open>
-                <summary class="category-dropdown-trigger">
-                  <span id="category-selected-label" class="category-selected-label">Programming Code &middot; Python</span>
-                  <span class="dropdown-chevron" aria-hidden="true">&#9662;</span>
-                </summary>
-
-                <ul id="category-list" class="category-list" aria-label="Category of thought">
-                  <li class="category-list-item has-submenu">
-                    <button
-                      type="button"
-                      class="category-item active"
-                      data-category="code"
-                      data-label="Programming Code"
-                      aria-pressed="true"
-                      aria-expanded="true"
-                      aria-controls="code-language-submenu"
-                    >
-                      <span class="category-item-label">Programming Code</span>
-                      <span class="submenu-chevron" aria-hidden="true">&#9662;</span>
-                    </button>
-
-                    <ul id="code-language-submenu" class="language-submenu" aria-label="Programming Language">
-                      <li><button type="button" class="submenu-item active" data-language="python" data-label="Python" aria-pressed="true">Python</button></li>
-                      <li><button type="button" class="submenu-item" data-language="powershell" data-label="PowerShell" aria-pressed="false">PowerShell</button></li>
-                      <li><button type="button" class="submenu-item" data-language="cpp" data-label="C++" aria-pressed="false">C++</button></li>
-                      <li><button type="button" class="submenu-item" data-language="csharp" data-label="C#" aria-pressed="false">C#</button></li>
-                      <li><button type="button" class="submenu-item" data-language="javascript" data-label="JavaScript" aria-pressed="false">JavaScript</button></li>
-                      <li><button type="button" class="submenu-item" data-language="typescript" data-label="TypeScript" aria-pressed="false">TypeScript</button></li>
-                      <li><button type="button" class="submenu-item" data-language="sql" data-label="SQL" aria-pressed="false">SQL</button></li>
-                    </ul>
-                  </li>
-                  <li class="category-list-item">
-                    <button type="button" class="category-item" data-category="prose" data-label="Prose &amp; Literature" aria-pressed="false">
-                      <span class="category-item-label">Prose &amp; Literature</span>
-                    </button>
-                  </li>
-                  <li class="category-list-item">
-                    <button type="button" class="category-item" data-category="reading" data-label="Reading &amp; Encyclopedic" aria-pressed="false">
-                      <span class="category-item-label">Reading &amp; Encyclopedic</span>
-                    </button>
-                  </li>
-                  <li class="category-list-item">
-                    <button type="button" class="category-item" data-category="technical" data-label="Technical &amp; Scientific" aria-pressed="false">
-                      <span class="category-item-label">Technical &amp; Scientific</span>
-                    </button>
-                  </li>
-                  <li class="category-list-item">
-                    <button type="button" class="category-item" data-category="formal" data-label="Formal &amp; Legal" aria-pressed="false">
-                      <span class="category-item-label">Formal &amp; Legal</span>
-                    </button>
-                  </li>
-                  <li class="category-list-item">
-                    <button type="button" class="category-item" data-category="conversational" data-label="Conversational Dialogue" aria-pressed="false">
-                      <span class="category-item-label">Conversational Dialogue</span>
-                    </button>
-                  </li>
-                </ul>
-              </details>
-            </aside>
-
             <div class="test-main">
               <!-- Live Stats -->
               <div class="live-stats">

@@ -1120,23 +1120,26 @@ def test_typing_thoughts_bottom_hovering_stats_dock():
 def test_typing_test_category_sidebar_dropdown_and_code_submenu():
     with _test_client() as client:
         html = client.get("/").text
-        assert 'class="test-layout"' in html
-        assert 'class="category-sidebar"' in html
-        assert 'id="category-sidebar-title" class="category-sidebar-title">Category of thought</h2>' in html
-        assert 'id="category-dropdown" class="category-dropdown" open' in html
+        assert 'id="category-sidebar" class="category-sidebar"' in html
+        assert 'id="category-sidebar-title" class="category-sidebar-title">Category</h2>' in html
+        assert 'id="category-dropdown"' not in html
+        assert 'category-dropdown-trigger' not in html
         assert 'id="category-list"' in html
         assert 'id="code-language-submenu"' in html
         assert 'data-category="code"' in html
         for lang in ("python", "powershell", "cpp", "csharp", "javascript", "typescript", "sql"):
             assert f'data-language="{lang}"' in html
+        assert html.index('</svg>') < html.index('id="category-sidebar"') < html.index('<div class="notebook-desk">')
         assert html.index('data-category="code"') < html.index('id="code-language-submenu"') < html.index('data-category="prose"')
 
         css = client.get("/static/styles.css").text
-        assert ".test-layout" in css
-        assert 'grid-template-areas: "sidebar main";' in css
+        assert "grid-template-columns: minmax(220px, 1fr) minmax(0, 1040px) minmax(220px, 1fr);" in css
+        assert ".category-sidebar[hidden]" in css
         assert ".language-submenu[hidden]" in css
 
         js = client.get("/static/app.js").text
+        assert "getElementById('category-sidebar')" in js
+        assert "categorySidebar.hidden = !isTest;" in js
         assert "languageSubmenu.hidden = selectedCategory !== 'code';" in js
 
 
