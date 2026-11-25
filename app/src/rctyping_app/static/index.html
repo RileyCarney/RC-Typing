@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="test-tab-active">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&family=Patrick+Hand&family=Press+Start+2P&display=swap">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
+<body class="test-tab-active">
 
   <!-- Shared SVG filter for graphite pencil stroke texture -->
   <svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
@@ -78,6 +78,22 @@
     </ul>
   </aside>
 
+  <aside id="file-explorer-sidebar" class="file-explorer-sidebar" aria-label="File Explorer" hidden>
+    <h2>File Explorer</h2>
+    <p class="muted-note file-explorer-note">
+      Locally encrypted <code>.md</code> thoughts. Drag thoughts onto any folder in the tree to organize.
+    </p>
+
+    <div class="file-explorer-actions">
+      <input type="text" id="new-folder-input" placeholder="New folder name..." aria-label="New folder name">
+      <button type="button" id="create-folder-btn" class="btn btn-secondary btn-xs">+ Add Folder</button>
+      <button type="button" id="export-brain-zip-btn" class="btn btn-xs">Export Brain (.zip)</button>
+    </div>
+
+    <div class="brain-sidebar-title">Folders &amp; Files</div>
+    <div id="brain-explorer-tree" class="folder-tree" aria-label="Brain folder structure explorer"></div>
+  </aside>
+
   <div class="notebook-desk">
     <div class="notebook-sheet">
       <div class="notebook-holes" aria-hidden="true"></div>
@@ -124,22 +140,6 @@
         <section id="tab-test" class="tab-content active">
           <div class="test-layout">
             <div class="test-main">
-              <!-- Live Stats -->
-              <div class="live-stats">
-                <div class="stat-card">
-                  <div class="stat-value pixel-stat-value" id="live-wpm">0</div>
-                  <div class="stat-label">Net WPM</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-value pixel-stat-value" id="live-accuracy">100%</div>
-                  <div class="stat-label">Accuracy</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-value pixel-stat-value" id="live-time">0.0s</div>
-                  <div class="stat-label">Time</div>
-                </div>
-              </div>
-
               <div class="test-toolbar">
                 <button type="button" id="new-passage-btn" class="btn">New Passage (Ctrl + Enter)</button>
               </div>
@@ -175,35 +175,14 @@
             <div class="focus-notice" id="thought-status-hint">Ready &mdash; start typing to measure WPM and time</div>
           </div>
 
-          <!-- BRAIN SECTION -->
+          <!-- THOUGHTS LIST SECTION -->
           <div class="passage-card" id="brain-section">
-            <div class="brain-toolbar">
-              <div>
-                <h2>File Explorer</h2>
-                <p class="muted-note" style="margin-top: 0.2rem;">
-                  Locally encrypted <code>.md</code> thoughts. Drag thoughts onto any folder in the tree to organize.
-                </p>
+            <div class="brain-main">
+              <div class="brain-main-header">
+                <span id="brain-current-path-heading">All Thoughts</span>
+                <span id="brain-thought-count" class="muted-note">0 thoughts</span>
               </div>
-              <div class="brain-actions">
-                <input type="text" id="new-folder-input" placeholder="New folder name..." aria-label="New folder name">
-                <button type="button" id="create-folder-btn" class="btn btn-secondary">+ Add Folder</button>
-                <button type="button" id="export-brain-zip-btn" class="btn">Export Brain (.zip)</button>
-              </div>
-            </div>
-
-            <div class="brain-layout">
-              <aside class="brain-sidebar" aria-label="Brain folder structure explorer">
-                <div class="brain-sidebar-title">Folders &amp; Files</div>
-                <div id="brain-explorer-tree" class="folder-tree"></div>
-              </aside>
-
-              <div class="brain-main">
-                <div class="brain-main-header">
-                  <span id="brain-current-path-heading">All Thoughts</span>
-                  <span id="brain-thought-count" class="muted-note">0 thoughts</span>
-                </div>
-                <div id="brain-thoughts-list" class="thoughts-list"></div>
-              </div>
+              <div id="brain-thoughts-list" class="thoughts-list"></div>
             </div>
           </div>
         </section>
@@ -316,6 +295,24 @@
       <footer class="footer">
         <a href="https://carn.si" target="_blank" rel="noopener noreferrer">https://carn.si</a>
       </footer>
+    </div>
+  </div>
+
+  <!-- TYPING TEST HOVERING BOTTOM STATS DOCK -->
+  <div id="test-stats-dock" class="test-stats-dock active" role="region" aria-label="Typing Test live stats">
+    <div class="live-stats">
+      <div class="stat-card">
+        <div class="stat-value pixel-stat-value" id="live-wpm">0</div>
+        <div class="stat-label">Net WPM</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value pixel-stat-value" id="live-accuracy">100%</div>
+        <div class="stat-label">Accuracy</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value pixel-stat-value" id="live-time">0.0s</div>
+        <div class="stat-label">Time</div>
+      </div>
     </div>
   </div>
 

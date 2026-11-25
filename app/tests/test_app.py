@@ -1116,6 +1116,78 @@ def test_typing_thoughts_bottom_hovering_stats_dock():
         assert "thoughts-tab-active" in js
 
 
+def test_typing_test_bottom_hovering_stats_dock():
+    import re
+    from html.parser import HTMLParser
+
+    class _TestDockParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_dock = False
+            self.dock_depth = 0
+            self.dock_stat_ids: list[str] = []
+            self.dock_hidden = False
+            self.dock_classes: list[str] = []
+            self.in_tab_test = False
+            self.tab_test_depth = 0
+            self.tab_test_stat_ids: list[str] = []
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            attr_map = dict(attrs)
+            el_id = attr_map.get("id") or ""
+            if el_id == "tab-test":
+                self.in_tab_test = True
+                self.tab_test_depth = 1
+            elif self.in_tab_test and tag == "section":
+                self.tab_test_depth += 1
+
+            if el_id == "test-stats-dock":
+                self.in_dock = True
+                self.dock_depth = 1
+                self.dock_hidden = "hidden" in attr_map
+                self.dock_classes = (attr_map.get("class") or "").split()
+            elif self.in_dock and tag == "div":
+                self.dock_depth += 1
+
+            if el_id in {"live-wpm", "live-accuracy", "live-time"}:
+                if self.in_dock:
+                    self.dock_stat_ids.append(el_id)
+                if self.in_tab_test:
+                    self.tab_test_stat_ids.append(el_id)
+
+        def handle_endtag(self, tag: str) -> None:
+            if self.in_dock and tag == "div":
+                self.dock_depth -= 1
+                if self.dock_depth == 0:
+                    self.in_dock = False
+            if self.in_tab_test and tag == "section":
+                self.tab_test_depth -= 1
+                if self.tab_test_depth == 0:
+                    self.in_tab_test = False
+
+    with _test_client() as client:
+        html = client.get("/").text
+        parser = _TestDockParser()
+        parser.feed(html)
+        assert parser.dock_hidden is False
+        assert "active" in parser.dock_classes
+        assert parser.dock_stat_ids == ["live-wpm", "live-accuracy", "live-time"]
+        assert parser.tab_test_stat_ids == []
+
+        css = client.get("/static/styles.css").text
+        dock_match = re.search(r"\.test-stats-dock,\s*\.thoughts-stats-dock\s*\{([^}]*)\}", css)
+        assert dock_match is not None
+        dock_block = dock_match.group(1)
+        assert "position: fixed;" in dock_block
+        assert "bottom: 0;" in dock_block
+        assert re.search(r"border-radius:\s*\d+px\s+\d+px\s+0\s+0;", dock_block)
+        assert "border-bottom: none;" in dock_block
+
+        js = client.get("/static/app.js").text
+        assert "getElementById('test-stats-dock')" in js
+        assert "test-tab-active" in js
+
+
 
 def test_typing_test_category_sidebar_dropdown_and_code_submenu():
     with _test_client() as client:
@@ -1141,6 +1213,51 @@ def test_typing_test_category_sidebar_dropdown_and_code_submenu():
         assert "getElementById('category-sidebar')" in js
         assert "categorySidebar.hidden = !isTest;" in js
         assert "languageSubmenu.hidden = selectedCategory !== 'code';" in js
+
+
+def test_typing_thoughts_file_explorer_left_sidebar_keeps_page_centered():
+    import re
+
+    with _test_client() as client:
+        html = client.get("/").text
+        assert 'id="file-explorer-sidebar" class="file-explorer-sidebar"' in html
+        assert re.search(r'<aside[^>]*id="file-explorer-sidebar"[^>]*\bhidden\b', html)
+
+        # File explorer sidebar lives outside .notebook-desk (in the left body grid column)
+        svg_end = html.index("</svg>")
+        explorer_idx = html.index('id="file-explorer-sidebar"')
+        desk_idx = html.index('<div class="notebook-desk">')
+        assert svg_end < explorer_idx < desk_idx
+
+        explorer_end = html.index("</aside>", explorer_idx)
+        explorer_markup = html[explorer_idx:explorer_end]
+        assert "<h2>File Explorer</h2>" in explorer_markup
+        assert 'id="new-folder-input"' in explorer_markup
+        assert 'id="create-folder-btn"' in explorer_markup
+        assert 'id="export-brain-zip-btn"' in explorer_markup
+        assert 'id="brain-explorer-tree"' in explorer_markup
+
+        # Center page still contains the thoughts composer and thoughts list, not the explorer tree
+        desk_markup = html[desk_idx:]
+        assert 'id="thought-input"' in desk_markup
+        assert 'id="brain-thoughts-list"' in desk_markup
+        assert 'id="brain-explorer-tree"' not in desk_markup
+
+        css = client.get("/static/styles.css").text
+        assert "grid-template-columns: minmax(220px, 1fr) minmax(0, 1040px) minmax(220px, 1fr);" in css
+        explorer_block = re.search(r"\.file-explorer-sidebar\s*\{([^}]*)\}", css)
+        assert explorer_block is not None
+        assert "grid-column: 1;" in explorer_block.group(1)
+        assert "justify-self: end;" in explorer_block.group(1)
+        assert ".file-explorer-sidebar[hidden]" in css
+        desk_block = re.search(r"\.notebook-desk\s*\{([^}]*)\}", css)
+        assert desk_block is not None
+        assert "grid-column: 2;" in desk_block.group(1)
+
+        js = client.get("/static/app.js").text
+        assert "getElementById('file-explorer-sidebar')" in js
+        assert "fileExplorerSidebar.hidden = !isThoughts;" in js
+
 
 
 

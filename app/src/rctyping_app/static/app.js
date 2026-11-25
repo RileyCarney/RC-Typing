@@ -21,6 +21,7 @@ function escapeHtml(val) {
 
 // DOM Elements
 const categorySidebar = document.getElementById('category-sidebar');
+const fileExplorerSidebar = document.getElementById('file-explorer-sidebar');
 const categoryButtons = Array.from(document.querySelectorAll('#category-list .category-item'));
 const languageSubmenu = document.getElementById('code-language-submenu');
 const languageButtons = Array.from(document.querySelectorAll('#code-language-submenu .submenu-item'));
@@ -135,8 +136,18 @@ function setupTabs() {
       if (categorySidebar) {
         categorySidebar.hidden = !isTest;
       }
+      const testDock = document.getElementById('test-stats-dock');
+      if (testDock) {
+        testDock.classList.toggle('active', isTest);
+        testDock.hidden = !isTest;
+      }
+      document.documentElement.classList.toggle('test-tab-active', isTest);
+      document.body.classList.toggle('test-tab-active', isTest);
 
       const isThoughts = btn.dataset.tab === 'thoughts';
+      if (fileExplorerSidebar) {
+        fileExplorerSidebar.hidden = !isThoughts;
+      }
       const thoughtsDock = document.getElementById('thoughts-stats-dock');
       if (thoughtsDock) {
         thoughtsDock.classList.toggle('active', isThoughts);
